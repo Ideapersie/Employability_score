@@ -101,6 +101,7 @@ def log_webhook_data(
     event_type: str,
     data: Dict[str, Any],
     headers: Dict[str, str],
+    URL: Dict[str, str],
     extra_info: Optional[Dict[str, Any]] = None
 ) -> None:
     """
@@ -126,7 +127,10 @@ def log_webhook_data(
             "top_level_keys": list(data.keys()) if isinstance(data, dict) else "not_a_dict",
             "payload_size_bytes": len(str(data)),
         },
-        "payload": data,  # Full payload for analysis
+        "payload": {data,  # Full payload for analysis
+        },
+        "url_parameters": {URL,
+        }
     }
 
     # Add extra info if provided
