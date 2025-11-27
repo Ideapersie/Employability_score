@@ -127,10 +127,8 @@ def log_webhook_data(
             "top_level_keys": list(data.keys()) if isinstance(data, dict) else "not_a_dict",
             "payload_size_bytes": len(str(data)),
         },
-        "payload": {data,  # Full payload for analysis
-        },
-        "url_parameters": {URL,
-        }
+        "payload": data,  # Full payload for analysis
+        "url_parameters": URL,
     }
 
     # Add extra info if provided
@@ -287,6 +285,7 @@ async def receive_fillout_webhook(request: Request):
     try:
         # Get request headers
         headers = dict(request.headers)
+        url_param = dict(request.url)
 
         # Get raw body
         body = await request.body()
@@ -312,6 +311,7 @@ async def receive_fillout_webhook(request: Request):
             event_type="webhook_received",
             data=payload,
             headers=headers,
+            url_param=url_param,
             extra_info={
                 "payload_keys_count": len(payload.keys()) if isinstance(payload, dict) else 0
             }
