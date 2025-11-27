@@ -415,4 +415,4 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 # Export the FastAPI app for Vercel
 # Vercel looks for 'app' variable in api/index.py
-handler = app
+
