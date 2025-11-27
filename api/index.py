@@ -127,7 +127,6 @@ def log_webhook_data(
             "payload_size_bytes": len(str(data)),
         },
         "payload": data,  # Full payload for analysis
-        "url_parameters": URL,
     }
 
     # Add extra info if provided
