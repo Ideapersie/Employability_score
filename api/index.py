@@ -387,7 +387,7 @@ Return as JSON with this exact structure:
                 {"role": "user", "content": user_prompt}
             ],
             response_format={"type": "json_object"},
-            temperature=0.7,
+            #temperature=0.7,
             #max_tokens=1500
             
         )
