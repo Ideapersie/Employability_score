@@ -563,26 +563,43 @@ import glob
 @app.get("/debug-tmp")
 async def list_temp_files():
     """
-    Lists all files currently in the /tmp directory.
-    Useful for debugging file uploads on Vercel.
+    Lists files in /tmp and reads the content of JSON/text files.
     """
-    # Get all files in /tmp
-    files = glob.glob("/tmp/**/*", recursive=True)
+    import glob
     
+    # Get all files
+    files = glob.glob("/tmp/**/*", recursive=True)
     file_details = []
+
     for f in files:
-        try:
-            # Get size for each file
-            size = os.path.getsize(f)
-            file_details.append({"path": f, "size_bytes": size})
-        except OSError:
-            file_details.append({"path": f, "error": "Could not read"})
+        # Only process if it is a file (not a directory or socket)
+        if os.path.isfile(f):
+            try:
+                size = os.path.getsize(f)
+                content = "[Binary or Large File - Not Read]"
+                
+                # If it's a JSON/Text file and small (< 1MB), read it
+                if size < 1_000_000 and (f.endswith(".json") or f.endswith(".txt") or f.endswith(".log")):
+                    with open(f, "r", encoding="utf-8", errors="replace") as file_obj:
+                        content = file_obj.read()
+                        
+                        # If it's JSON, try to parse it so it looks pretty
+                        try:
+                            content = json.loads(content)
+                        except:
+                            pass # Keep as string if parsing fails
+
+                file_details.append({
+                    "path": f, 
+                    "size_bytes": size,
+                    "content": content
+                })
+            except Exception as e:
+                file_details.append({"path": f, "error": str(e)})
 
     return {
-        "status": "success",
-        "count": len(files),
-        "files": file_details,
-        "note": "Remember: /tmp is ephemeral and unique to this specific function instance."
+        "count": len(file_details),
+        "files": file_details
     }
 
 
