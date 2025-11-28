@@ -256,6 +256,235 @@ def get_environment_status() -> Dict[str, bool]:
     }
 
 
+async def download_pdf(url: str) -> Optional[bytes]:
+    """
+    Download PDF from Fillout S3 URL
+
+    Args:
+        url: S3 URL to PDF file
+
+    Returns:
+        PDF file as bytes, or None if download fails
+    """
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+
+            print(f"PDF downloaded successfully - Size: {len(response.content)} bytes")
+            return response.content
+
+    except httpx.TimeoutException:
+        print(f"Timeout downloading PDF from {url}")
+        return None
+    except httpx.HTTPStatusError as e:
+        print(f"HTTP error downloading PDF: {e.response.status_code}")
+        return None
+    except Exception as e:
+        print(f"Error downloading PDF: {str(e)}")
+        return None
+
+
+def extract_text_from_pdf(pdf_bytes: bytes) -> Optional[str]:
+    """
+    Extract text content from PDF bytes
+
+    Args:
+        pdf_bytes: PDF file as bytes
+
+    Returns:
+        Extracted text as string, or None if extraction fails
+    """
+    try:
+        pdf_file = BytesIO(pdf_bytes)
+        reader = PdfReader(pdf_file)
+
+        text_parts = []
+        for page_num, page in enumerate(reader.pages):
+            page_text = page.extract_text()
+            if page_text:
+                text_parts.append(page_text)
+
+        full_text = "\n\n".join(text_parts)
+        print(f"Text extracted from {len(reader.pages)} pages - Total length: {len(full_text)} chars")
+
+        return full_text if full_text.strip() else None
+
+    except Exception as e:
+        print(f"Error extracting text from PDF: {str(e)}")
+        return None
+
+
+async def analyze_cv_with_openai(cv_text: str, candidate_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Analyze CV content using OpenAI GPT-4o
+
+    Args:
+        cv_text: Extracted text from CV
+        candidate_data: Form data from webhook (name, skills, experience, etc.)
+
+    Returns:
+        Structured analysis with work experience, education, skills, strengths, improvements, and CV quality score
+    """
+    try:
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            print("OPENAI_API_KEY not configured")
+            return None
+
+        client = OpenAI(api_key=api_key)
+
+        system_prompt = "You are an expert career counselor and CV analyst. Analyze the provided CV and candidate information to assess employability."
+
+        user_prompt = f"""Analyze this CV and provide structured feedback:
+
+CV Content:
+{cv_text[:4000]}
+
+Candidate Information:
+- Name: {candidate_data.get('FullName', 'N/A')}
+- Experience Level: {candidate_data.get('ExperienceLvl', 'N/A')}
+- Basic Skills: {', '.join(candidate_data.get('BasicSkills', []))}
+- Other Skills: {candidate_data.get('OtherSkills', 'N/A')}
+- Soft Skills: {', '.join(candidate_data.get('SoftSkills', []))}
+
+Provide:
+1. Work experience summary (summary text, years of experience, roles)
+2. Education summary (highest level, field, institutions)
+3. Technical skills identified from CV
+4. Soft skills identified from CV
+5. Career level assessment (entry/mid/senior)
+6. Key strengths (3-5 points)
+7. Areas for improvement (3-5 points)
+8. CV quality score (0-100) based on completeness, clarity, and professionalism
+
+Return as JSON with this exact structure:
+{{
+  "work_experience": {{
+    "summary": "brief summary",
+    "years": 0,
+    "roles": ["role1", "role2"]
+  }},
+  "education": {{
+    "highest_level": "degree level",
+    "field": "field of study",
+    "institutions": ["institution1"]
+  }},
+  "skills": {{
+    "technical": ["skill1", "skill2"],
+    "soft": ["skill1", "skill2"]
+  }},
+  "career_level": "entry",
+  "strengths": ["strength1", "strength2"],
+  "improvements": ["improvement1", "improvement2"],
+  "cv_quality_score": 85
+}}"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7,
+            max_tokens=1500
+        )
+
+        analysis = json.loads(response.choices[0].message.content)
+        print(f"OpenAI analysis completed - CV Quality Score: {analysis.get('cv_quality_score', 'N/A')}")
+
+        return analysis
+
+    except Exception as e:
+        print(f"Error calling OpenAI API: {str(e)}")
+        return None
+
+
+def calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], form_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Calculate employability score (0-100) combining OpenAI analysis and form responses
+
+    Scoring breakdown:
+    - CV Quality: 30 points (from OpenAI)
+    - Skills Match: 25 points (from form + CV)
+    - Experience Level: 25 points
+    - Personality Fit: 20 points (People + StructuredTask scores)
+
+    Args:
+        openai_analysis: Analysis results from OpenAI (or None if failed)
+        form_data: Form submission data
+
+    Returns:
+        Dictionary with total score, breakdown, grade, and percentile
+    """
+    breakdown = {
+        "cv_quality": 0,
+        "skills_match": 0,
+        "experience": 0,
+        "personality_fit": 0
+    }
+
+    # 1. CV Quality Score (0-30 points)
+    if openai_analysis and "cv_quality_score" in openai_analysis:
+        cv_quality = openai_analysis["cv_quality_score"]
+        breakdown["cv_quality"] = int((cv_quality / 100) * 30)
+    else:
+        breakdown["cv_quality"] = 15
+
+    # 2. Skills Match (0-25 points)
+    basic_skills = form_data.get("BasicSkills", [])
+    other_skills = form_data.get("OtherSkills", "")
+    soft_skills = form_data.get("SoftSkills", [])
+
+    skills_count = len(basic_skills) + len(soft_skills)
+    if other_skills and other_skills.strip():
+        skills_count += len(other_skills.split(","))
+
+    breakdown["skills_match"] = min(25, skills_count * 3)
+
+    # 3. Experience Level (0-25 points)
+    experience_mapping = {
+        "Just starting out": 5,
+        "Some experience": 12,
+        "Experienced": 18,
+        "Very experienced": 25
+    }
+    experience_level = form_data.get("ExperienceLvl", "Just starting out")
+    breakdown["experience"] = experience_mapping.get(experience_level, 10)
+
+    # 4. Personality Fit (0-20 points)
+    people_score = form_data.get("People", 3)
+    structured_score = form_data.get("StructuredTask", 3)
+    breakdown["personality_fit"] = int(((people_score + structured_score) / 10) * 20)
+
+    total_score = sum(breakdown.values())
+
+    # Calculate grade
+    if total_score >= 90:
+        grade = "A+"
+    elif total_score >= 80:
+        grade = "A"
+    elif total_score >= 70:
+        grade = "B+"
+    elif total_score >= 60:
+        grade = "B"
+    elif total_score >= 50:
+        grade = "C+"
+    else:
+        grade = "C"
+
+    # Estimate percentile
+    percentile = min(99, int((total_score / 100) * 100))
+
+    return {
+        "total": total_score,
+        "breakdown": breakdown,
+        "grade": grade,
+        "percentile": percentile
+    }
+
+
 # ============================================================================
 # API ENDPOINTS
 # ============================================================================
