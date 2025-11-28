@@ -401,6 +401,38 @@ Return as JSON with this exact structure:
         return None
 
 
+def save_analysis_to_json(submission_id: str, analysis_data: Dict[str, Any]) -> bool:
+    """
+    Save complete analysis results to a JSON file
+
+    Args:
+        submission_id: Unique submission ID for the filename
+        analysis_data: Complete analysis data to save
+
+    Returns:
+        True if saved successfully, False otherwise
+    """
+    try:
+        # Create results directory if it doesn't exist
+        results_dir = "analysis_results"
+        os.makedirs(results_dir, exist_ok=True)
+
+        # Create filename with timestamp
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        filename = f"{results_dir}/{submission_id}_{timestamp}.json"
+
+        # Save to JSON file
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(analysis_data, f, indent=2, default=str, ensure_ascii=False)
+
+        print(f"Analysis saved to {filename}")
+        return True
+
+    except Exception as e:
+        print(f"Error saving analysis to JSON: {str(e)}")
+        return False
+
+
 def calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], form_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Calculate employability score (0-100) combining OpenAI analysis and form responses
