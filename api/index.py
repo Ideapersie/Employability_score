@@ -379,9 +379,9 @@ Return as JSON with this exact structure:
   "improvements": ["improvement1", "improvement2"],
   "cv_quality_score": 85
 }}"""
-
+        # Planned changes to model gpt-5-nano
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5-nano",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
