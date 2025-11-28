@@ -716,6 +716,31 @@ async def receive_fillout_webhook(request: Request):
         processing_time = int((time.time() - start_time) * 1000)
         response_data["processing_time_ms"] = processing_time
 
+        # Save complete analysis to JSON file
+        complete_analysis = {
+            "submission_id": submission_id,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "candidate": response_data["candidate"],
+            "form_data": {
+                "basic_skills": payload.get("BasicSkills", []),
+                "other_skills": payload.get("OtherSkills", ""),
+                "experience_level": payload.get("ExperienceLvl", ""),
+                "soft_skills": payload.get("SoftSkills", []),
+                "people_score": payload.get("People", 0),
+                "structured_task_score": payload.get("StructuredTask", 0),
+                "linkedin": payload.get("Linkedin", ""),
+                "phone": payload.get("PhoneNo", ""),
+                "dob": payload.get("DoB", "")
+            },
+            "cv_analysis": response_data["cv_analysis"],
+            "employability_score": response_data["employability_score"],
+            "recommendations": response_data["recommendations"],
+            "processing_time_ms": processing_time,
+            "errors": response_data["errors"]
+        }
+
+        save_analysis_to_json(submission_id, complete_analysis)
+
         print(f"Webhook processed successfully - Submission: {submission_id}, Score: {employability_score['total']}/100, Time: {processing_time}ms")
 
         return JSONResponse(status_code=200, content=response_data)
