@@ -405,6 +405,8 @@ def save_analysis_to_json(submission_id: str, analysis_data: Dict[str, Any]) -> 
     """
     Save complete analysis results to a JSON file
 
+    Uses /tmp on Vercel (temporary storage) and local directory for development
+
     Args:
         submission_id: Unique submission ID for the filename
         analysis_data: Complete analysis data to save
@@ -413,8 +415,12 @@ def save_analysis_to_json(submission_id: str, analysis_data: Dict[str, Any]) -> 
         True if saved successfully, False otherwise
     """
     try:
-        # Create results directory if it doesn't exist
-        results_dir = "analysis_results"
+        # Use /tmp on Vercel (writable but temporary), local directory otherwise
+        if os.environ.get("VERCEL"):
+            results_dir = "/tmp/analysis_results"
+        else:
+            results_dir = "analysis_results"
+
         os.makedirs(results_dir, exist_ok=True)
 
         # Create filename with timestamp
