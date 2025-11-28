@@ -556,6 +556,34 @@ async def health_check():
         "service": "webhook-receiver",
         "environment_configured": get_environment_status()
     }
+    
+import os
+import glob
+
+@app.get("/debug-tmp")
+async def list_temp_files():
+    """
+    Lists all files currently in the /tmp directory.
+    Useful for debugging file uploads on Vercel.
+    """
+    # Get all files in /tmp
+    files = glob.glob("/tmp/**/*", recursive=True)
+    
+    file_details = []
+    for f in files:
+        try:
+            # Get size for each file
+            size = os.path.getsize(f)
+            file_details.append({"path": f, "size_bytes": size})
+        except OSError:
+            file_details.append({"path": f, "error": "Could not read"})
+
+    return {
+        "status": "success",
+        "count": len(files),
+        "files": file_details,
+        "note": "Remember: /tmp is ephemeral and unique to this specific function instance."
+    }
 
 
 @app.post("/webhook/fillout")
