@@ -615,7 +615,7 @@ async def receive_fillout_webhook(request: Request):
         candidate_email = None
 
         # Try to find submission ID (field name might vary)
-        for key in ["submissionId", "submission_id", "id", "Submission ID"]:
+        for key in ["SubmissionID", "submissionId", "submission_id", "id", "Submission ID"]:
             if key in payload:
                 submission_id = payload[key]
                 break
