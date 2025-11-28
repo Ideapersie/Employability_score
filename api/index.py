@@ -388,7 +388,8 @@ Return as JSON with this exact structure:
             ],
             response_format={"type": "json_object"},
             temperature=0.7,
-            max_tokens=1500
+            #max_tokens=1500
+            
         )
 
         analysis = json.loads(response.choices[0].message.content)
@@ -737,7 +738,7 @@ async def receive_fillout_webhook(request: Request):
         employability_score = calculate_employability_score(cv_analysis, payload)
         response_data["employability_score"] = employability_score
 
-        # Add recommendations
+        # Add recommendations (Static) -> CHanged to dynamic later
         if employability_score["total"] >= 70:
             response_data["recommendations"]["next_steps"] = [
                 "Your profile is strong! Focus on networking and applying to target companies.",
