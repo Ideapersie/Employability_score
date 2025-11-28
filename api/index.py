@@ -525,18 +525,20 @@ async def receive_fillout_webhook(request: Request):
     """
     Main webhook endpoint to receive Fillout.com submissions
 
-    This endpoint:
+    Phase 2 Implementation:
     1. Receives the webhook POST request
-    2. Extracts headers and body
-    3. Logs complete payload structure
-    4. Extracts CV/PDF information
-    5. Returns 200 OK acknowledgment
+    2. Downloads CV from Fillout S3
+    3. Extracts text from PDF
+    4. Analyzes CV with OpenAI GPT-4o
+    5. Calculates employability score (0-100)
+    6. Returns comprehensive results
 
     Future enhancements:
-    - Parse CV with OpenAI
-    - Match jobs with Adzuna
-    - Send results to Webflow
+    - Match jobs with Adzuna (Phase 3)
+    - Send results to Webflow (Phase 4)
     """
+    start_time = time.time()
+
     try:
         # Get request headers
         headers = dict(request.headers)
@@ -589,23 +591,105 @@ async def receive_fillout_webhook(request: Request):
             if candidate_email:
                 break
 
-        # Return success response
+        # Parse payload with new model
+        try:
+            webhook_data = FilloutWebhookPayload(**payload)
+        except Exception as validation_error:
+            print(f"Payload validation warning: {str(validation_error)}")
+            # Continue with raw payload if validation fails
+            webhook_data = None
+
+        # Initialize response structure
         response_data = {
             "status": "success",
-            "message": "Webhook received and logged",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
             "submission_id": submission_id,
-            "candidate_email": candidate_email,
-            "next_steps": "CV processing will be implemented in Phase 2"
+            "candidate": {
+                "name": payload.get("FullName", "Unknown"),
+                "email": candidate_email
+            },
+            "employability_score": None,
+            "cv_analysis": None,
+            "recommendations": {
+                "next_steps": [],
+                "suggested_roles": []
+            },
+            "processing_time_ms": 0,
+            "errors": []
         }
 
-        print(f"✅ Webhook processed successfully - Submission ID: {submission_id}")
+        # Phase 2: CV Processing
+        cv_analysis = None
+        cv_url = None
+
+        # Extract CV URL
+        if "CV" in payload and isinstance(payload["CV"], list) and len(payload["CV"]) > 0:
+            cv_url = payload["CV"][0].get("url")
+
+        if cv_url:
+            print(f"Processing CV from URL: {cv_url[:50]}...")
+
+            # Step 1: Download PDF
+            pdf_bytes = await download_pdf(cv_url)
+
+            if pdf_bytes:
+                # Step 2: Extract text
+                cv_text = extract_text_from_pdf(pdf_bytes)
+
+                if cv_text:
+                    # Step 3: Analyze with OpenAI
+                    cv_analysis = await analyze_cv_with_openai(cv_text, payload)
+
+                    if cv_analysis:
+                        response_data["cv_analysis"] = cv_analysis
+                    else:
+                        response_data["errors"].append("OpenAI analysis failed")
+                else:
+                    response_data["errors"].append("PDF text extraction failed")
+            else:
+                response_data["errors"].append("PDF download failed")
+        else:
+            response_data["errors"].append("No CV URL found in payload")
+
+        # Step 4: Calculate employability score
+        employability_score = calculate_employability_score(cv_analysis, payload)
+        response_data["employability_score"] = employability_score
+
+        # Add recommendations
+        if employability_score["total"] >= 70:
+            response_data["recommendations"]["next_steps"] = [
+                "Your profile is strong! Focus on networking and applying to target companies.",
+                "Consider specialized certifications to stand out further.",
+                "Practice interview skills to maximize your opportunities."
+            ]
+        elif employability_score["total"] >= 50:
+            response_data["recommendations"]["next_steps"] = [
+                "Build more practical experience through projects or internships.",
+                "Expand your skill set in your target industry.",
+                "Enhance your CV with quantifiable achievements."
+            ]
+        else:
+            response_data["recommendations"]["next_steps"] = [
+                "Focus on building foundational skills in your chosen field.",
+                "Consider entry-level positions or apprenticeships to gain experience.",
+                "Invest in relevant courses or certifications.",
+                "Seek mentorship from professionals in your target industry."
+            ]
+
+        # Phase 3 placeholder: Job recommendations via Adzuna
+        response_data["recommendations"]["suggested_roles"] = [
+            "Job matching with Adzuna API will be implemented in Phase 3"
+        ]
+
+        # Calculate processing time
+        processing_time = int((time.time() - start_time) * 1000)
+        response_data["processing_time_ms"] = processing_time
+
+        print(f"Webhook processed successfully - Submission: {submission_id}, Score: {employability_score['total']}/100, Time: {processing_time}ms")
 
         return JSONResponse(status_code=200, content=response_data)
 
     except Exception as e:
         # Log error but still return 200 to webhook provider
-        # We don't want Fillout to retry due to our errors
         error_info = {
             "error_type": type(e).__name__,
             "error_message": str(e),
@@ -621,12 +705,27 @@ async def receive_fillout_webhook(request: Request):
 
         print(f"Error processing webhook: {str(e)}")
 
-        # Return 200 to prevent retries
+        # Return error response with basic score
+        processing_time = int((time.time() - start_time) * 1000)
+
         return JSONResponse(
             status_code=200,
             content={
-                "status": "error_logged",
-                "message": "Error occurred but logged for investigation"
+                "status": "error",
+                "message": "Error occurred during processing",
+                "error": str(e),
+                "employability_score": {
+                    "total": 0,
+                    "breakdown": {
+                        "cv_quality": 0,
+                        "skills_match": 0,
+                        "experience": 0,
+                        "personality_fit": 0
+                    },
+                    "grade": "N/A",
+                    "percentile": 0
+                },
+                "processing_time_ms": processing_time
             }
         )
 
