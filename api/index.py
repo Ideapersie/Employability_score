@@ -651,7 +651,7 @@ async def get_job_recommendations(
             jobs = await search_adzuna_jobs(
                 keywords=[keyword],
                 location="london",
-                results_per_page=4,
+                results_per_page=8,
                 sort_by="relevance"
             )
             if jobs:
