@@ -510,7 +510,7 @@ async def search_adzuna_jobs(
             return None
 
         # Construct API URL
-        base_url = f"http://api.adzuna.com/v1/api/jobs/gb/search/{page}"
+        base_url = f"https://api.adzuna.com/v1/api/jobs/gb/search/{page}"
 
         # Build query parameters
         params = {
