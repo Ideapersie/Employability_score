@@ -447,6 +447,41 @@ def extract_current_keywords(candidate_data: Dict[str, Any], cv_analysis: Option
     
 
 
+# Swap the roles to be a +1 position
+def extract_future_keywords(candidate_data: Dict[str, Any], current_keywords: List[str]) -> List[str]:
+    """
+    Generate keywords for future/advanced job search
+
+    Args:
+        candidate_data: Form submission data with experience level
+        current_keywords: List of current skills
+
+    Returns:
+        List of advanced role keywords
+    """
+    experience_level = candidate_data.get("ExperienceLvl", "Just starting out")
+
+    # Map experience levels to advancement keywords
+    advancement_map = {
+        "Just starting out": ["Junior", "Assistant"],
+        "Some experience": ["Senior", "Lead"],
+        "Experienced": ["Manager", "Principal", "Head of"],
+        "Very experienced": ["Director"]
+    }
+
+    advancement_terms = advancement_map.get(experience_level, ["Senior"])
+
+    # Generate future role keywords
+    future_keywords = []
+    primary_skill = current_keywords[0] if current_keywords else "Professional"
+
+    for term in advancement_terms[:2]:
+        future_keywords.append(f"{term} {primary_skill}")
+
+    return future_keywords
+
+
+
 def save_analysis_to_json(submission_id: str, analysis_data: Dict[str, Any]) -> bool:
     """
     Save complete analysis results to a JSON file
