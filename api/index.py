@@ -359,6 +359,8 @@ Provide:
 6. Key strengths (3-5 points)
 7. Areas for improvement (3-5 points)
 8. CV quality score (0-100) based on completeness, clarity, and professionalism
+9. Suggested job roles (List of 3 specific job titles best suited for profile's skills
+
 
 Return as JSON with this exact structure:
 {{
@@ -379,7 +381,8 @@ Return as JSON with this exact structure:
   "career_level": "entry",
   "strengths": ["strength1", "strength2"],
   "improvements": ["improvement1", "improvement2"],
-  "cv_quality_score": 85
+  "cv_quality_score": number between 0-100,
+  "suggested_job_roles": ["Role 1", "Role 2", "Role 3] 
 }}"""
         # Planned changes to model gpt-5-nano
         response = client.chat.completions.create(
@@ -419,21 +422,27 @@ def extract_current_keywords(candidate_data: Dict[str, Any], cv_analysis: Option
         List of keywords prioritized for current job search
     """
     keywords = []
-
-    # Priority 1: Basic skills from form
-    basic_skills = candidate_data.get("BasicSkills", [])
-    keywords.extend(basic_skills)
-
-    # Priority 2: Technical skills from CV
-    if cv_analysis and "skills" in cv_analysis:
-        tech_skills = cv_analysis["skills"].get("technical", [])
-        keywords.extend(tech_skills[:3])
-
-    # Priority 3: Other skills (comma-separated)
+    
+    # Priority 1: Job roles recommendation from LLM
+    # These are specific titles like "AI Engineer" derived from the CV content
+    if cv_analysis and "suggested_job_roles" in cv_analysis:
+        suggested_roles = cv_analysis.get("suggested_job_roles", [])
+        keywords.extend(suggested_roles)
+    
+    # Priority 2: Other skills (comma-separated)
     other_skills = candidate_data.get("OtherSkills", "")
     if other_skills:
         skills_list = [s.strip() for s in other_skills.split(",") if s.strip()]
         keywords.extend(skills_list[:2])
+
+    # Priority 3: Technical skills from CV
+    if cv_analysis and "skills" in cv_analysis:
+        tech_skills = cv_analysis["skills"].get("technical", [])
+        keywords.extend(tech_skills[:3])
+        
+    # Priority 4: Basic skills from form
+    basic_skills = candidate_data.get("BasicSkills", [])
+    keywords.extend(basic_skills)
 
     # Deduplicate while preserving order
     seen = set()
