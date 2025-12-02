@@ -110,6 +110,7 @@ class FilloutWebhookPayload(BaseModel):
     SoftSkills: List[str]
     People: int = Field(ge=1, le=5)
     StructuredTask: int = Field(ge=1, le=5)
+    InitiativeTask: int = Field(ge=1, le=5)
     FullName: str
     DoB: str
     Email: str
@@ -775,7 +776,8 @@ def calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], for
     # 4. Personality Fit (0-20 points)
     people_score = form_data.get("People", 3)
     structured_score = form_data.get("StructuredTask", 3)
-    breakdown["personality_fit"] = int(((people_score + structured_score) / 10) * 20)
+    initiative_score = form_data.get("InitiativeTask", 3)
+    breakdown["personality_fit"] = int(((people_score + structured_score + initiative_score) / 10) * 20)
 
     total_score = sum(breakdown.values())
 
@@ -1076,6 +1078,7 @@ async def receive_fillout_webhook(request: Request):
                 "soft_skills": payload.get("SoftSkills", []),
                 "people_score": payload.get("People", 0),
                 "structured_task_score": payload.get("StructuredTask", 0),
+                "initiative_score": payload.get("InitiativeTask", 0),
                 "linkedin": payload.get("Linkedin", ""),
                 "phone": payload.get("PhoneNo", ""),
                 "dob": payload.get("DoB", "")
