@@ -1057,11 +1057,6 @@ async def receive_fillout_webhook(request: Request):
                 "Seek mentorship from professionals in your target industry."
             ]
 
-        # Phase 3 placeholder: Job recommendations via Adzuna
-        response_data["recommendations"]["suggested_roles"] = [
-            "Job matching with Adzuna API will be implemented in Phase 3"
-        ]
-
         # Calculate processing time
         processing_time = int((time.time() - start_time) * 1000)
         response_data["processing_time_ms"] = processing_time
