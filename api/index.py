@@ -647,12 +647,12 @@ async def get_job_recommendations(
         current_jobs_raw = []
 
         # Make 3 searches with top keywords
-        for keyword in current_keywords[:3]:
+        for keyword in current_keywords[:5]:
             jobs = await search_adzuna_jobs(
                 keywords=[keyword],
                 location="london",
                 results_per_page=20,
-                sort_by="relevane"
+                sort_by="relevance"
             )
             if jobs:
                 current_jobs_raw.extend(jobs)
