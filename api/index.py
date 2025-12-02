@@ -251,7 +251,8 @@ def get_environment_status() -> Dict[str, bool]:
     """
     return {
         "OPENAI_API_KEY": bool(os.environ.get("OPENAI_API_KEY")),
-        "ADZUNA_API_KEY": bool(os.environ.get("ADZUNA_API_KEY")),
+        "ADZUNA_APP_ID": bool(os.environ.get("ADZUNA_APP_ID")),
+        "ADZUNA_APP_KEY": bool(os.environ.get("ADZUNA_APP_KEY")),
         "WEBFLOW_API_KEY": bool(os.environ.get("WEBFLOW_API_KEY")),
     }
 
@@ -400,6 +401,50 @@ Return as JSON with this exact structure:
     except Exception as e:
         print(f"Error calling OpenAI API: {str(e)}")
         return None
+    
+# ============================================================================
+# ADZUNA JOB SEARCH FUNCTIONS (Phase 3)
+# ============================================================================
+
+def extract_current_keywords(candidate_data: Dict[str, Any], cv_analysis: Optional[Dict[str, Any]]) -> List[str]:
+    """
+    Extract keywords for current job search from candidate data and CV analysis
+
+    Args:
+        candidate_data: Form submission data
+        cv_analysis: OpenAI CV analysis results
+
+    Returns:
+        List of keywords prioritized for current job search
+    """
+    keywords = []
+
+    # Priority 1: Basic skills from form
+    basic_skills = candidate_data.get("BasicSkills", [])
+    keywords.extend(basic_skills)
+
+    # Priority 2: Technical skills from CV
+    if cv_analysis and "skills" in cv_analysis:
+        tech_skills = cv_analysis["skills"].get("technical", [])
+        keywords.extend(tech_skills[:3])
+
+    # Priority 3: Other skills (comma-separated)
+    other_skills = candidate_data.get("OtherSkills", "")
+    if other_skills:
+        skills_list = [s.strip() for s in other_skills.split(",") if s.strip()]
+        keywords.extend(skills_list[:2])
+
+    # Deduplicate while preserving order
+    seen = set()
+    unique_keywords = []
+    for keyword in keywords:
+        keyword_lower = keyword.lower()
+        if keyword_lower not in seen:
+            seen.add(keyword_lower)
+            unique_keywords.append(keyword)
+
+    return unique_keywords[:5]  # Limit to top 5
+    
 
 
 def save_analysis_to_json(submission_id: str, analysis_data: Dict[str, Any]) -> bool:
@@ -738,7 +783,23 @@ async def receive_fillout_webhook(request: Request):
         employability_score = calculate_employability_score(cv_analysis, payload)
         response_data["employability_score"] = employability_score
 
-        # Add recommendations (Static) -> CHanged to dynamic later
+        # Phase 3: Job Recommendations via Adzuna
+        job_recommendations = await get_job_recommendations(payload, cv_analysis)
+
+        if job_recommendations:
+            response_data["recommendations"]["suggested_roles"] = job_recommendations
+            print(f"Added {len(job_recommendations)} job recommendations to response")
+        else:
+            response_data["recommendations"]["suggested_roles"] = []
+            if not os.environ.get("ADZUNA_APP_ID") or not os.environ.get("ADZUNA_APP_KEY"):
+                response_data["recommendations"]["suggested_roles"] = [{
+                    "message": "Job recommendations require Adzuna API credentials",
+                    "setup_instructions": "Visit https://developer.adzuna.com/ to register"
+                }]
+            else:
+                response_data["errors"].append("Job recommendations temporarily unavailable")
+
+        # Add recommendations (Static next_steps) -> CHanged to dynamic later
         if employability_score["total"] >= 70:
             response_data["recommendations"]["next_steps"] = [
                 "Your profile is strong! Focus on networking and applying to target companies.",
