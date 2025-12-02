@@ -651,8 +651,8 @@ async def get_job_recommendations(
             jobs = await search_adzuna_jobs(
                 keywords=[keyword],
                 location="london",
-                results_per_page=8,
-                sort_by="relevance"
+                results_per_page=20,
+                sort_by="relevane"
             )
             if jobs:
                 current_jobs_raw.extend(jobs)
@@ -664,7 +664,7 @@ async def get_job_recommendations(
             jobs = await search_adzuna_jobs(
                 keywords=[keyword],
                 location="london",
-                results_per_page=2,
+                results_per_page=6,
                 sort_by="relevance"
             )
             if jobs:
