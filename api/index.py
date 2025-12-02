@@ -786,7 +786,7 @@ def calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], for
     people_score = form_data.get("People", 3)
     structured_score = form_data.get("StructuredTask", 3)
     initiative_score = form_data.get("InitiativeTask", 3)
-    breakdown["personality_fit"] = int(((people_score + structured_score + initiative_score) / 10) * 20)
+    breakdown["personality_fit"] = int(((people_score + structured_score + initiative_score) / 15) * 20)
 
     total_score = sum(breakdown.values())
 
