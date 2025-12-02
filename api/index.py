@@ -444,7 +444,6 @@ def extract_current_keywords(candidate_data: Dict[str, Any], cv_analysis: Option
             unique_keywords.append(keyword)
 
     return unique_keywords[:5]  # Limit to top 5
-    
 
 
 # Swap the roles to be a +1 position
@@ -609,6 +608,78 @@ def format_job_for_response(adzuna_job: Dict, job_type: str) -> Dict:
     }
 
 
+async def get_job_recommendations(
+    candidate_data: Dict[str, Any],
+    cv_analysis: Optional[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    Get job recommendations for a candidate (8 current + 2 future jobs)
+
+    Args:
+        candidate_data: Form submission data with skills and experience
+        cv_analysis: OpenAI CV analysis results (can be None)
+
+    Returns:
+        List of 10 job recommendations with job_type field
+    """
+    try:
+        # Extract keywords for current and future jobs
+        current_keywords = extract_current_keywords(candidate_data, cv_analysis)
+        future_keywords = extract_future_keywords(candidate_data, current_keywords)
+
+        if not current_keywords:
+            print("No keywords found for job search")
+            return []
+
+        print(f"Job search keywords - Current: {current_keywords}, Future: {future_keywords}")
+
+        # Search for current jobs (target 10-12 to allow for deduplication)
+        current_jobs_raw = []
+
+        # Make 3 searches with top keywords
+        for keyword in current_keywords[:3]:
+            jobs = await search_adzuna_jobs(
+                keywords=[keyword],
+                location="london",
+                results_per_page=4,
+                sort_by="relevance"
+            )
+            if jobs:
+                current_jobs_raw.extend(jobs)
+
+        # Search for future jobs
+        future_jobs_raw = []
+
+        for keyword in future_keywords[:2]:
+            jobs = await search_adzuna_jobs(
+                keywords=[keyword],
+                location="london",
+                results_per_page=2,
+                sort_by="relevance"
+            )
+            if jobs:
+                future_jobs_raw.extend(jobs)
+
+        # Deduplicate and limit
+        current_jobs = deduplicate_jobs(current_jobs_raw)[:8]
+        future_jobs = deduplicate_jobs(future_jobs_raw)[:2]
+
+        # Format for response
+        formatted_jobs = []
+
+        for job in current_jobs:
+            formatted_jobs.append(format_job_for_response(job, "current"))
+
+        for job in future_jobs:
+            formatted_jobs.append(format_job_for_response(job, "future"))
+
+        print(f"Job recommendations prepared: {len(current_jobs)} current, {len(future_jobs)} future")
+
+        return formatted_jobs
+
+    except Exception as e:
+        print(f"Error getting job recommendations: {str(e)}")
+        return []
 
 
 def save_analysis_to_json(submission_id: str, analysis_data: Dict[str, Any]) -> bool:
