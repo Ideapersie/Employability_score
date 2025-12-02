@@ -545,6 +545,68 @@ async def search_adzuna_jobs(
         print(f"Adzuna API error: {str(e)}")
         return None
 
+def deduplicate_jobs(jobs: List[Dict]) -> List[Dict]:
+    """
+    Remove duplicate jobs based on company + title
+
+    Args:
+        jobs: List of job dictionaries from Adzuna
+
+    Returns:
+        Deduplicated list of jobs
+    """
+    seen = set()
+    unique_jobs = []
+
+    for job in jobs:
+        company = job.get("company", {}).get("display_name", "").lower().strip()
+        title = job.get("title", "").lower().strip()
+
+        # Create unique key
+        key = f"{company}::{title}"
+
+        if key not in seen and title and company:
+            seen.add(key)
+            unique_jobs.append(job)
+
+    return unique_jobs
+
+
+def format_job_for_response(adzuna_job: Dict, job_type: str) -> Dict:
+    """
+    Extract and format relevant fields from Adzuna job
+
+    Args:
+        adzuna_job: Raw job dict from Adzuna API
+        job_type: "current" or "future"
+
+    Returns:
+        Formatted job dictionary
+    """
+    # Format salary
+    salary_min = adzuna_job.get("salary_min")
+    salary_max = adzuna_job.get("salary_max")
+
+    if salary_min and salary_max:
+        salary = f"£{salary_min:,.0f} - £{salary_max:,.0f}"
+    elif salary_min:
+        salary = f"£{salary_min:,.0f}+"
+    elif salary_max:
+        salary = f"Up to £{salary_max:,.0f}"
+    else:
+        salary = "Not specified"
+
+    return {
+        "job_type": job_type,
+        "title": adzuna_job.get("title", "N/A"),
+        "company": adzuna_job.get("company", {}).get("display_name", "N/A"),
+        "location": adzuna_job.get("location", {}).get("display_name", "N/A"),
+        "description": adzuna_job.get("description", "")[:500],  # Truncate
+        "salary": salary,
+        "contract_time": adzuna_job.get("contract_time", "N/A"),
+        "url": adzuna_job.get("redirect_url", ""),
+        "posted_date": adzuna_job.get("created", "N/A"),
+    }
 
 
 
