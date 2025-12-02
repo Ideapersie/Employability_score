@@ -481,6 +481,73 @@ def extract_future_keywords(candidate_data: Dict[str, Any], current_keywords: Li
     return future_keywords
 
 
+async def search_adzuna_jobs(
+    keywords: List[str],
+    location: str = "london",
+    results_per_page: int = 5,
+    sort_by: str = "relevance",
+    page: int = 1
+) -> Optional[List[Dict[str, Any]]]:
+    """
+    Search for jobs on Adzuna API
+
+    Args:
+        keywords: List of skills/keywords to search for
+        location: Location to search in (default: "london")
+        results_per_page: Number of results to return (1-50)
+        sort_by: Sort order ("relevance" or "date")
+        page: Page number for pagination
+
+    Returns:
+        List of job dictionaries or None if API call fails
+    """
+    try:
+        app_id = os.environ.get("ADZUNA_APP_ID")
+        app_key = os.environ.get("ADZUNA_APP_KEY")
+
+        if not app_id or not app_key:
+            print("Adzuna credentials not configured")
+            return None
+
+        # Construct API URL
+        base_url = f"http://api.adzuna.com/v1/api/jobs/gb/search/{page}"
+
+        # Build query parameters
+        params = {
+            "app_id": app_id,
+            "app_key": app_key,
+            "results_per_page": min(results_per_page, 50),  # Max 30
+            "what": " ".join(keywords),
+            "where": location,
+            "sort_by": sort_by
+        }
+
+        print(f"Adzuna search: what='{params['what']}', where='{location}'")
+
+        # Make API request
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(base_url, params=params)
+            response.raise_for_status()
+
+            data = response.json()
+            results = data.get("results", [])
+
+            print(f"Adzuna API returned {len(results)} jobs")
+            return results
+
+    except httpx.TimeoutException:
+        print(f"Adzuna API timeout for query: {keywords}")
+        return None
+    except httpx.HTTPStatusError as e:
+        print(f"Adzuna API HTTP error {e.response.status_code}: {keywords}")
+        return None
+    except Exception as e:
+        print(f"Adzuna API error: {str(e)}")
+        return None
+
+
+
+
 
 def save_analysis_to_json(submission_id: str, analysis_data: Dict[str, Any]) -> bool:
     """
