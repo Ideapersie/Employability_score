@@ -781,6 +781,94 @@ def extract_top_skills_for_translation(
     return skill_descriptions
 
 
+async def translate_skills_to_corporate(skills_to_translate: List[str]) -> List[Dict[str, str]]:
+    """
+    Translate casual/student skills into professional corporate terminology using OpenAI
+
+    Args:
+        skills_to_translate: List of 1-3 skill descriptions in casual language
+
+    Returns:
+        List of dicts with 'original', 'corporate', and 'category' fields
+    """
+    try:
+        if not skills_to_translate or len(skills_to_translate) == 0:
+            return []
+
+        # Get OpenAI API key
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            print("OpenAI API key not configured for skills translation")
+            # Return original skills with default category
+            return [
+                {
+                    "original": skill,
+                    "corporate": skill,
+                    "category": "professional"
+                }
+                for skill in skills_to_translate
+            ]
+
+        # Prepare the prompt
+        system_prompt = """You are a professional resume writer specializing in translating casual or student experience into corporate/professional terminology.
+
+Your task: Transform casual skill descriptions into polished, industry-standard professional skills.
+
+Guidelines:
+- Use action-oriented, concrete language
+- Maintain accuracy - don't exaggerate
+- Use industry-standard terminology
+- Keep it concise (max 6-8 words)
+- Categorize as: technical, leadership, professional, analytical, creative
+
+Examples:
+Input: "Team leader in university projects"
+Output: "Project Management & Team Leadership" (category: leadership)
+
+Input: "Organised charity events"
+Output: "Event Coordination & Cross-functional Collaboration" (category: professional)
+
+Input: "Good with Excel"
+Output: "Data Analysis & Financial Modeling" (category: technical)
+
+Input: "Python programming"
+Output: "Python Development & Programming" (category: technical)"""
+
+        # Build numbered list of skills
+        skills_list = "\n".join([f"{i+1}. {skill}" for i, skill in enumerate(skills_to_translate)])
+
+        user_prompt = f"""Transform these {len(skills_to_translate)} skill(s) into professional corporate terminology:
+
+{skills_list}
+
+Return as JSON array with this exact structure:
+[
+  {{"original": "...", "corporate": "...", "category": "..."}},
+  {{"original": "...", "corporate": "...", "category": "..."}}
+]
+
+Ensure you return exactly {len(skills_to_translate)} item(s) in the array."""
+
+        print(f"Translating {len(skills_to_translate)} skills to corporate terminology...")
+
+        # Call OpenAI API
+        client = OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3,
+            max_tokens=300
+        )
+
+        # Parse response
+        result = json.loads(response.choices[0].message.content)
+
+        
+
 
     
 
