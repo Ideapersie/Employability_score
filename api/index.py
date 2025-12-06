@@ -692,6 +692,48 @@ async def get_job_recommendations(
         return []
 
 
+# ============================================================================
+# TOP SKILLS CORPORATE TRANSLATION FUNCTIONS (Phase 4)
+# ============================================================================
+
+def extract_top_skills_for_translation(
+    candidate_data: Dict[str, Any],
+    cv_analysis: Optional[Dict[str, Any]],
+    cv_text: Optional[str]
+) -> List[str]:
+    """
+    Extract top 3 skills from candidate data for corporate translation
+
+    Prioritizes:
+    1. Skills with concrete examples in CV
+    2. Technical skills from CV analysis
+    3. Self-reported skills from form
+
+    Args:
+        candidate_data: Form submission data
+        cv_analysis: OpenAI CV analysis results
+        cv_text: Raw CV text
+
+    Returns:
+        List of 3 skill descriptions with context
+    """
+    skills_with_scores = []
+
+    # Priority 1: Extract skills from CV work experience with context
+    if cv_analysis and "work_experience" in cv_analysis:
+        work_exp = cv_analysis.get("work_experience", {})
+        roles = work_exp.get("roles", [])
+
+        # Add roles/responsibilities as skills with context
+        for role in roles[:3]:  # Top 3 roles
+            skills_with_scores.append({
+                "description": role,
+                "score": 3,
+                "source": "cv_experience"
+            })
+
+    
+
 def save_analysis_to_json(submission_id: str, analysis_data: Dict[str, Any]) -> bool:
     """
     Save complete analysis results to a JSON file
@@ -988,6 +1030,7 @@ async def receive_fillout_webhook(request: Request):
                 "next_steps": [],
                 "suggested_roles": []
             },
+            "top_skills_corporate": [], 
             "processing_time_ms": 0,
             "errors": []
         }
@@ -995,7 +1038,7 @@ async def receive_fillout_webhook(request: Request):
         # Phase 2: CV Processing
         cv_analysis = None
         cv_url = None
-
+        cv_text = None  
         # Extract CV URL
         if "CV" in payload and isinstance(payload["CV"], list) and len(payload["CV"]) > 0:
             cv_url = payload["CV"][0].get("url")
@@ -1045,6 +1088,35 @@ async def receive_fillout_webhook(request: Request):
             else:
                 response_data["errors"].append("Job recommendations temporarily unavailable")
 
+        # Phase 4: Top Skills Corporate Translation
+        if cv_analysis and cv_text:
+            top_skills_raw = extract_top_skills_for_translation(payload, cv_analysis, cv_text)
+
+            if top_skills_raw and len(top_skills_raw) > 0:
+                top_skills_corporate = await translate_skills_to_corporate(top_skills_raw)
+                response_data["top_skills_corporate"] = top_skills_corporate
+                print(f"Added {len(top_skills_corporate)} corporate skill translations to response")
+            else:
+                print("No skills found for corporate translation")
+        else:
+            # Fallback: Extract from form data only if no CV
+            if not cv_analysis:
+                basic_skills = payload.get("BasicSkills", [])
+                other_skills = payload.get("OtherSkills", "")
+
+                fallback_skills = []
+                fallback_skills.extend(basic_skills[:2])
+
+                if other_skills and other_skills.strip():
+                    other_skills_list = [s.strip() for s in other_skills.split(",") if s.strip()]
+                    fallback_skills.extend(other_skills_list[:1])
+
+                if fallback_skills:
+                    fallback_skills = fallback_skills[:3]
+                    top_skills_corporate = await translate_skills_to_corporate(fallback_skills)
+                    response_data["top_skills_corporate"] = top_skills_corporate
+                    print(f"Added {len(top_skills_corporate)} corporate skill translations from form data")
+
         # Add recommendations (Static next_steps) -> CHanged to dynamic later
         if employability_score["total"] >= 70:
             response_data["recommendations"]["next_steps"] = [
@@ -1090,6 +1162,7 @@ async def receive_fillout_webhook(request: Request):
             "cv_analysis": response_data["cv_analysis"],
             "employability_score": response_data["employability_score"],
             "recommendations": response_data["recommendations"],
+            "top_skills_corporate": response_data["top_skills_corporate"],
             "processing_time_ms": processing_time,
             "errors": response_data["errors"]
         }
