@@ -754,6 +754,34 @@ def extract_top_skills_for_translation(
                 "source": "form_basic"
             })
 
+
+    # Priority 4: OtherSkills from form (comma-separated)
+    other_skills_str = candidate_data.get("OtherSkills", "")
+    if other_skills_str and other_skills_str.strip():
+        other_skills = [s.strip() for s in other_skills_str.split(",") if s.strip()]
+        for skill in other_skills[:3]:
+            if not any(skill.lower() in s["description"].lower() for s in skills_with_scores):
+                skills_with_scores.append({
+                    "description": skill,
+                    "score": 1,
+                    "source": "form_other"
+                })
+
+    # Bonus: Skills mentioned multiple times get +1 score
+
+    # Sort by score (highest first) and select top 3
+    skills_with_scores.sort(key=lambda x: x["score"], reverse=True)
+    top_skills = skills_with_scores[:3]
+
+    # Return just the descriptions
+    skill_descriptions = [s["description"] for s in top_skills]
+
+    print(f"Extracted {len(skill_descriptions)} top skills for translation: {skill_descriptions}")
+
+    return skill_descriptions
+
+
+
     
 
 def save_analysis_to_json(submission_id: str, analysis_data: Dict[str, Any]) -> bool:
