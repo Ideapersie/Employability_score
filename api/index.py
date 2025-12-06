@@ -867,7 +867,43 @@ Ensure you return exactly {len(skills_to_translate)} item(s) in the array."""
         # Parse response
         result = json.loads(response.choices[0].message.content)
 
-        
+        # Handle different possible response formats
+        if isinstance(result, dict) and "skills" in result:
+            translated_skills = result["skills"]
+        elif isinstance(result, dict) and "translations" in result:
+            translated_skills = result["translations"]
+        elif isinstance(result, list):
+            translated_skills = result
+        else:
+            # Try to extract array from dict
+            for key, value in result.items():
+                if isinstance(value, list):
+                    translated_skills = value
+                    break
+            else:
+                raise ValueError("Could not find skills array in response")
+
+        # Validate structure
+        for skill in translated_skills:
+            if "original" not in skill or "corporate" not in skill or "category" not in skill:
+                raise ValueError("Invalid skill structure in response")
+
+        print(f"Successfully translated {len(translated_skills)} skills to corporate terminology")
+
+        return translated_skills
+
+    except Exception as e:
+        print(f"Error translating skills to corporate terminology: {str(e)}")
+
+        # Fallback: Return original skills with default categories
+        return [
+            {
+                "original": skill,
+                "corporate": skill,
+                "category": "professional"
+            }
+            for skill in skills_to_translate
+        ]
 
 
     
