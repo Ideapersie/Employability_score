@@ -731,6 +731,28 @@ def extract_top_skills_for_translation(
                 "score": 3,
                 "source": "cv_experience"
             })
+            
+    # Priority 2: Technical skills from CV analysis
+    if cv_analysis and "skills" in cv_analysis:
+        tech_skills = cv_analysis.get("skills", {}).get("technical", [])
+        for skill in tech_skills[:5]:
+            # Check if skill already added (avoid duplicates)
+            if not any(skill.lower() in s["description"].lower() for s in skills_with_scores):
+                skills_with_scores.append({
+                    "description": skill,
+                    "score": 2,
+                    "source": "cv_technical"
+                })
+
+    # Priority 3: BasicSkills from form
+    basic_skills = candidate_data.get("BasicSkills", [])
+    for skill in basic_skills[:3]:
+        if not any(skill.lower() in s["description"].lower() for s in skills_with_scores):
+            skills_with_scores.append({
+                "description": skill,
+                "score": 1,
+                "source": "form_basic"
+            })
 
     
 
