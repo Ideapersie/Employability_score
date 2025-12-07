@@ -694,19 +694,15 @@ async def get_job_recommendations(
 
 def save_analysis_to_json(submission_id: str, analysis_data: Dict[str, Any]) -> bool:
     """
-    Save complete analysis results to a JSON file
-
-    Uses /tmp on Vercel (temporary storage) and local directory for development
-
-    Args:
-        submission_id: Unique submission ID for the filename
-        analysis_data: Complete analysis data to save
-
-    Returns:
-        True if saved successfully, False otherwise
+    Log analysis to console (Persistent) and try to save to file (Ephemeral)
     """
     try:
-        # Use /tmp on Vercel (writable but temporary), local directory otherwise
+        # 1. ALWAYS Log to console (This is your persistent storage for now)
+        print(f"--- COMPLETE ANALYSIS FOR {submission_id} ---")
+        print(json.dumps(analysis_data, indent=2, default=str, ensure_ascii=False))
+        print(f"---------------------------------------------")
+
+        # 2. Try to save to file (existing logic)
         if os.environ.get("VERCEL"):
             results_dir = "/tmp/analysis_results"
         else:
