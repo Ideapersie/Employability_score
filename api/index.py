@@ -110,6 +110,7 @@ class FilloutWebhookPayload(BaseModel):
     SoftSkills: List[str]
     People: int = Field(ge=1, le=5)
     StructuredTask: int = Field(ge=1, le=5)
+    InitiativeTask: int = Field(ge=1, le=5)
     FullName: str
     DoB: str
     Email: str
@@ -358,6 +359,8 @@ Provide:
 6. Key strengths (3-5 points)
 7. Areas for improvement (3-5 points)
 8. CV quality score (0-100) based on completeness, clarity, and professionalism
+9. Suggested job roles (List of 3 specific job titles best suited for profile's skills
+
 
 Return as JSON with this exact structure:
 {{
@@ -378,7 +381,8 @@ Return as JSON with this exact structure:
   "career_level": "entry",
   "strengths": ["strength1", "strength2"],
   "improvements": ["improvement1", "improvement2"],
-  "cv_quality_score": 85
+  "cv_quality_score": number between 0-100,
+  "suggested_job_roles": ["Role 1", "Role 2", "Role 3] 
 }}"""
         # Planned changes to model gpt-5-nano
         response = client.chat.completions.create(
@@ -418,21 +422,27 @@ def extract_current_keywords(candidate_data: Dict[str, Any], cv_analysis: Option
         List of keywords prioritized for current job search
     """
     keywords = []
-
-    # Priority 1: Basic skills from form
-    basic_skills = candidate_data.get("BasicSkills", [])
-    keywords.extend(basic_skills)
-
-    # Priority 2: Technical skills from CV
-    if cv_analysis and "skills" in cv_analysis:
-        tech_skills = cv_analysis["skills"].get("technical", [])
-        keywords.extend(tech_skills[:3])
-
-    # Priority 3: Other skills (comma-separated)
+    
+    # Priority 1: Job roles recommendation from LLM
+    # These are specific titles like "AI Engineer" derived from the CV content
+    if cv_analysis and "suggested_job_roles" in cv_analysis:
+        suggested_roles = cv_analysis.get("suggested_job_roles", [])
+        keywords.extend(suggested_roles)
+    
+    # Priority 2: Other skills (comma-separated)
     other_skills = candidate_data.get("OtherSkills", "")
     if other_skills:
         skills_list = [s.strip() for s in other_skills.split(",") if s.strip()]
         keywords.extend(skills_list[:2])
+
+    # Priority 3: Technical skills from CV
+    if cv_analysis and "skills" in cv_analysis:
+        tech_skills = cv_analysis["skills"].get("technical", [])
+        keywords.extend(tech_skills[:3])
+        
+    # Priority 4: Basic skills from form
+    basic_skills = candidate_data.get("BasicSkills", [])
+    keywords.extend(basic_skills)
 
     # Deduplicate while preserving order
     seen = set()
@@ -509,7 +519,7 @@ async def search_adzuna_jobs(
             return None
 
         # Construct API URL
-        base_url = f"http://api.adzuna.com/v1/api/jobs/gb/search/{page}"
+        base_url = f"https://api.adzuna.com/v1/api/jobs/gb/search/{page}"
 
         # Build query parameters
         params = {
@@ -637,11 +647,11 @@ async def get_job_recommendations(
         current_jobs_raw = []
 
         # Make 3 searches with top keywords
-        for keyword in current_keywords[:3]:
+        for keyword in current_keywords[:5]:
             jobs = await search_adzuna_jobs(
                 keywords=[keyword],
                 location="london",
-                results_per_page=4,
+                results_per_page=20,
                 sort_by="relevance"
             )
             if jobs:
@@ -654,7 +664,7 @@ async def get_job_recommendations(
             jobs = await search_adzuna_jobs(
                 keywords=[keyword],
                 location="london",
-                results_per_page=2,
+                results_per_page=6,
                 sort_by="relevance"
             )
             if jobs:
@@ -775,7 +785,8 @@ def calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], for
     # 4. Personality Fit (0-20 points)
     people_score = form_data.get("People", 3)
     structured_score = form_data.get("StructuredTask", 3)
-    breakdown["personality_fit"] = int(((people_score + structured_score) / 10) * 20)
+    initiative_score = form_data.get("InitiativeTask", 3)
+    breakdown["personality_fit"] = int(((people_score + structured_score + initiative_score) / 15) * 20)
 
     total_score = sum(breakdown.values())
 
@@ -1055,11 +1066,6 @@ async def receive_fillout_webhook(request: Request):
                 "Seek mentorship from professionals in your target industry."
             ]
 
-        # Phase 3 placeholder: Job recommendations via Adzuna
-        response_data["recommendations"]["suggested_roles"] = [
-            "Job matching with Adzuna API will be implemented in Phase 3"
-        ]
-
         # Calculate processing time
         processing_time = int((time.time() - start_time) * 1000)
         response_data["processing_time_ms"] = processing_time
@@ -1076,6 +1082,7 @@ async def receive_fillout_webhook(request: Request):
                 "soft_skills": payload.get("SoftSkills", []),
                 "people_score": payload.get("People", 0),
                 "structured_task_score": payload.get("StructuredTask", 0),
+                "initiative_score": payload.get("InitiativeTask", 0),
                 "linkedin": payload.get("Linkedin", ""),
                 "phone": payload.get("PhoneNo", ""),
                 "dob": payload.get("DoB", "")
