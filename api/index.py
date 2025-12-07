@@ -1417,6 +1417,16 @@ async def receive_fillout_webhook(request: Request):
                 "Seek mentorship from professionals in your target industry."
             ]
 
+        # Phase 5: Send to Webflow CMS
+        webflow_result = await send_to_webflow_cms(submission_id, response_data)
+
+        if webflow_result:
+            response_data["webflow_results_url"] = webflow_result["results_url"]
+            response_data["webflow_item_id"] = webflow_result["webflow_item_id"]
+            print(f"Results page created: {webflow_result['results_url']}")
+        else:
+            print("Webflow CMS integration skipped or failed")
+
         # Calculate processing time
         processing_time = int((time.time() - start_time) * 1000)
         response_data["processing_time_ms"] = processing_time
