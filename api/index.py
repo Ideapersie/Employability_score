@@ -692,6 +692,222 @@ async def get_job_recommendations(
         return []
 
 
+# ============================================================================
+# TOP SKILLS CORPORATE TRANSLATION FUNCTIONS (Phase 4)
+# ============================================================================
+
+def extract_top_skills_for_translation(
+    candidate_data: Dict[str, Any],
+    cv_analysis: Optional[Dict[str, Any]],
+    cv_text: Optional[str]
+) -> List[str]:
+    """
+    Extract top 3 skills from candidate data for corporate translation
+
+    Prioritizes:
+    1. Skills with concrete examples in CV
+    2. Technical skills from CV analysis
+    3. Self-reported skills from form
+
+    Args:
+        candidate_data: Form submission data
+        cv_analysis: OpenAI CV analysis results
+        cv_text: Raw CV text
+
+    Returns:
+        List of 3 skill descriptions with context
+    """
+    skills_with_scores = []
+
+    # Priority 1: Extract skills from CV work experience with context
+    if cv_analysis and "work_experience" in cv_analysis:
+        work_exp = cv_analysis.get("work_experience", {})
+        roles = work_exp.get("roles", [])
+
+        # Add roles/responsibilities as skills with context
+        for role in roles[:3]:  # Top 3 roles
+            skills_with_scores.append({
+                "description": role,
+                "score": 3,
+                "source": "cv_experience"
+            })
+            
+    # Priority 2: Technical skills from CV analysis
+    if cv_analysis and "skills" in cv_analysis:
+        tech_skills = cv_analysis.get("skills", {}).get("technical", [])
+        for skill in tech_skills[:5]:
+            # Check if skill already added (avoid duplicates)
+            if not any(skill.lower() in s["description"].lower() for s in skills_with_scores):
+                skills_with_scores.append({
+                    "description": skill,
+                    "score": 2,
+                    "source": "cv_technical"
+                })
+
+    # Priority 3: BasicSkills from form
+    basic_skills = candidate_data.get("BasicSkills", [])
+    for skill in basic_skills[:3]:
+        if not any(skill.lower() in s["description"].lower() for s in skills_with_scores):
+            skills_with_scores.append({
+                "description": skill,
+                "score": 1,
+                "source": "form_basic"
+            })
+
+
+    # Priority 4: OtherSkills from form (comma-separated)
+    other_skills_str = candidate_data.get("OtherSkills", "")
+    if other_skills_str and other_skills_str.strip():
+        other_skills = [s.strip() for s in other_skills_str.split(",") if s.strip()]
+        for skill in other_skills[:3]:
+            if not any(skill.lower() in s["description"].lower() for s in skills_with_scores):
+                skills_with_scores.append({
+                    "description": skill,
+                    "score": 1,
+                    "source": "form_other"
+                })
+
+    # Bonus: Skills mentioned multiple times get +1 score
+
+    # Sort by score (highest first) and select top 3
+    skills_with_scores.sort(key=lambda x: x["score"], reverse=True)
+    top_skills = skills_with_scores[:3]
+
+    # Return just the descriptions
+    skill_descriptions = [s["description"] for s in top_skills]
+
+    print(f"Extracted {len(skill_descriptions)} top skills for translation: {skill_descriptions}")
+
+    return skill_descriptions
+
+
+async def translate_skills_to_corporate(skills_to_translate: List[str]) -> List[Dict[str, str]]:
+    """
+    Translate casual/student skills into professional corporate terminology using OpenAI
+
+    Args:
+        skills_to_translate: List of 1-3 skill descriptions in casual language
+
+    Returns:
+        List of dicts with 'original', 'corporate', and 'category' fields
+    """
+    try:
+        if not skills_to_translate or len(skills_to_translate) == 0:
+            return []
+
+        # Get OpenAI API key
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            print("OpenAI API key not configured for skills translation")
+            # Return original skills with default category
+            return [
+                {
+                    "original": skill,
+                    "corporate": skill,
+                    "category": "professional"
+                }
+                for skill in skills_to_translate
+            ]
+
+        # Prepare the prompt
+        system_prompt = """You are a professional resume writer specializing in translating casual or student experience into corporate/professional terminology.
+
+Your task: Transform casual skill descriptions into polished, industry-standard professional skills.
+
+Guidelines:
+- Use action-oriented, concrete language
+- Maintain accuracy - don't exaggerate
+- Use industry-standard terminology
+- Keep it concise (max 6-8 words)
+- Categorize as: technical, leadership, professional, analytical, creative
+
+Examples:
+Input: "Team leader in university projects"
+Output: "Project Management & Team Leadership" (category: leadership)
+
+Input: "Organised charity events"
+Output: "Event Coordination & Cross-functional Collaboration" (category: professional)
+
+Input: "Good with Excel"
+Output: "Data Analysis & Financial Modeling" (category: technical)
+
+Input: "Python programming"
+Output: "Python Development & Programming" (category: technical)"""
+
+        # Build numbered list of skills
+        skills_list = "\n".join([f"{i+1}. {skill}" for i, skill in enumerate(skills_to_translate)])
+
+        user_prompt = f"""Transform these {len(skills_to_translate)} skill(s) into professional corporate terminology:
+
+{skills_list}
+
+Return as JSON array with this exact structure:
+[
+  {{"original": "...", "corporate": "...", "category": "..."}},
+  {{"original": "...", "corporate": "...", "category": "..."}}
+]
+
+Ensure you return exactly {len(skills_to_translate)} item(s) in the array."""
+
+        print(f"Translating {len(skills_to_translate)} skills to corporate terminology...")
+
+        # Call OpenAI API
+        client = OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3,
+            max_tokens=300
+        )
+
+        # Parse response
+        result = json.loads(response.choices[0].message.content)
+
+        # Handle different possible response formats
+        if isinstance(result, dict) and "skills" in result:
+            translated_skills = result["skills"]
+        elif isinstance(result, dict) and "translations" in result:
+            translated_skills = result["translations"]
+        elif isinstance(result, list):
+            translated_skills = result
+        else:
+            # Try to extract array from dict
+            for key, value in result.items():
+                if isinstance(value, list):
+                    translated_skills = value
+                    break
+            else:
+                raise ValueError("Could not find skills array in response")
+
+        # Validate structure
+        for skill in translated_skills:
+            if "original" not in skill or "corporate" not in skill or "category" not in skill:
+                raise ValueError("Invalid skill structure in response")
+
+        print(f"Successfully translated {len(translated_skills)} skills to corporate terminology")
+
+        return translated_skills
+
+    except Exception as e:
+        print(f"Error translating skills to corporate terminology: {str(e)}")
+
+        # Fallback: Return original skills with default categories
+        return [
+            {
+                "original": skill,
+                "corporate": skill,
+                "category": "professional"
+            }
+            for skill in skills_to_translate
+        ]
+
+
+    
+
 def save_analysis_to_json(submission_id: str, analysis_data: Dict[str, Any]) -> bool:
     """
     Log analysis to console (Persistent) and try to save to file (Ephemeral)
@@ -984,6 +1200,7 @@ async def receive_fillout_webhook(request: Request):
                 "next_steps": [],
                 "suggested_roles": []
             },
+            "top_skills_corporate": [], 
             "processing_time_ms": 0,
             "errors": []
         }
@@ -991,7 +1208,7 @@ async def receive_fillout_webhook(request: Request):
         # Phase 2: CV Processing
         cv_analysis = None
         cv_url = None
-
+        cv_text = None  
         # Extract CV URL
         if "CV" in payload and isinstance(payload["CV"], list) and len(payload["CV"]) > 0:
             cv_url = payload["CV"][0].get("url")
@@ -1041,6 +1258,35 @@ async def receive_fillout_webhook(request: Request):
             else:
                 response_data["errors"].append("Job recommendations temporarily unavailable")
 
+        # Phase 4: Top Skills Corporate Translation
+        if cv_analysis and cv_text:
+            top_skills_raw = extract_top_skills_for_translation(payload, cv_analysis, cv_text)
+
+            if top_skills_raw and len(top_skills_raw) > 0:
+                top_skills_corporate = await translate_skills_to_corporate(top_skills_raw)
+                response_data["top_skills_corporate"] = top_skills_corporate
+                print(f"Added {len(top_skills_corporate)} corporate skill translations to response")
+            else:
+                print("No skills found for corporate translation")
+        else:
+            # Fallback: Extract from form data only if no CV
+            if not cv_analysis:
+                basic_skills = payload.get("BasicSkills", [])
+                other_skills = payload.get("OtherSkills", "")
+
+                fallback_skills = []
+                fallback_skills.extend(basic_skills[:2])
+
+                if other_skills and other_skills.strip():
+                    other_skills_list = [s.strip() for s in other_skills.split(",") if s.strip()]
+                    fallback_skills.extend(other_skills_list[:1])
+
+                if fallback_skills:
+                    fallback_skills = fallback_skills[:3]
+                    top_skills_corporate = await translate_skills_to_corporate(fallback_skills)
+                    response_data["top_skills_corporate"] = top_skills_corporate
+                    print(f"Added {len(top_skills_corporate)} corporate skill translations from form data")
+
         # Add recommendations (Static next_steps) -> CHanged to dynamic later
         if employability_score["total"] >= 70:
             response_data["recommendations"]["next_steps"] = [
@@ -1086,6 +1332,7 @@ async def receive_fillout_webhook(request: Request):
             "cv_analysis": response_data["cv_analysis"],
             "employability_score": response_data["employability_score"],
             "recommendations": response_data["recommendations"],
+            "top_skills_corporate": response_data["top_skills_corporate"],
             "processing_time_ms": processing_time,
             "errors": response_data["errors"]
         }
