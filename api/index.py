@@ -254,7 +254,8 @@ def get_environment_status() -> Dict[str, bool]:
         "OPENAI_API_KEY": bool(os.environ.get("OPENAI_API_KEY")),
         "ADZUNA_APP_ID": bool(os.environ.get("ADZUNA_APP_ID")),
         "ADZUNA_APP_KEY": bool(os.environ.get("ADZUNA_APP_KEY")),
-        "WEBFLOW_API_KEY": bool(os.environ.get("WEBFLOW_API_KEY")),
+        "WEBFLOW_API_TOKEN": bool(os.environ.get("WEBFLOW_API_TOKEN")),
+        "WEBFLOW_COLLECTION_ID": bool(os.environ.get("WEBFLOW_COLLECTION_ID")),
     }
 
 
@@ -1200,7 +1201,9 @@ async def receive_fillout_webhook(request: Request):
                 "next_steps": [],
                 "suggested_roles": []
             },
-            "top_skills_corporate": [], 
+            "top_skills_corporate": [],
+            "webflow_results_url": None,
+            "webflow_item_id": None,
             "processing_time_ms": 0,
             "errors": []
         }
@@ -1333,6 +1336,8 @@ async def receive_fillout_webhook(request: Request):
             "employability_score": response_data["employability_score"],
             "recommendations": response_data["recommendations"],
             "top_skills_corporate": response_data["top_skills_corporate"],
+            "webflow_results_url": response_data["webflow_results_url"],
+            "webflow_item_id": response_data["webflow_item_id"],
             "processing_time_ms": processing_time,
             "errors": response_data["errors"]
         }
