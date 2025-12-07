@@ -1336,7 +1336,7 @@ async def receive_fillout_webhook(request: Request):
             "cv_analysis": response_data["cv_analysis"],
             "employability_score": response_data["employability_score"],
             "recommendations": response_data["recommendations"],
-            "top_skills_corporate": response_data["top_skills_corporate"],
+            #"top_skills_corporate": response_data["top_skills_corporate"],
             "processing_time_ms": processing_time,
             "errors": response_data["errors"]
         }
