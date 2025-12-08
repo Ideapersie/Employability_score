@@ -995,7 +995,7 @@ async def send_to_webflow_cms(
             webflow_id = result.get("id")
 
             # Construct results URL
-            results_url = f"/form-results/form-result-page/{slug}"
+            results_url = f"www.ukngn.com/form-results/applicant-006"
 
             print(f"Successfully sent to Webflow CMS: {webflow_id}")
 
