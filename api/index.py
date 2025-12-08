@@ -975,14 +975,14 @@ async def send_to_webflow_cms(
             "fieldData": {
                 "name": candidate.get("name", "Unknown"),
                 "slug": slug,
-                "candidate-email": candidate.get("email", ""),
-                "employability-score": score.get("total", 0),
-                "score-breakdown": score_breakdown,
-                "top-skill-1": skill_texts[0],
-                "top-skill-2": skill_texts[1],
-                "top-skill-3": skill_texts[2],
-                "job-recommendations": job_summary,
-                "submission-timestamp": datetime.utcnow().isoformat() + "Z"
+                #"candidate-email": candidate.get("email", ""),
+                "employability-score": str(score.get("total", 0)),
+                #"score-breakdown": score_breakdown,
+                #"top-skill-1": skill_texts[0],
+                #"top-skill-2": skill_texts[1],
+                #"top-skill-3": skill_texts[2],
+                #"job-recommendations": job_summary,
+                #"submission-timestamp": datetime.utcnow().isoformat() + "Z"
             }
         }
 
