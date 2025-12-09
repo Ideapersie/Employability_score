@@ -20,7 +20,8 @@ from pypdf import PdfReader
 from io import BytesIO
 from openai import OpenAI
 import time
-
+import hmac
+import hashlib
 
 # ============================================================================
 # FASTAPI APP INITIALIZATION
@@ -173,6 +174,48 @@ def log_webhook_data(
     print("=" * 80)
     print(json.dumps(log_entry, indent=2, default=str))
     print("=" * 80)
+    
+def verify_webflow_signature(body_bytes: bytes, headers: dict, secret: str) -> bool:
+    """
+    Verifies that the webhook actually came from Webflow.
+    
+    Webflow Signatures format:
+    x-webflow-signature: hash
+    x-webflow-timestamp: 123456789
+    
+    Verification = HMAC_SHA256(secret, timestamp + ":" + raw_body)
+    """
+    try:
+        # 1. Get headers
+        timestamp = headers.get("x-webflow-timestamp")
+        signature = headers.get("x-webflow-signature")
+        
+        if not timestamp or not signature:
+            print("Missing Webflow verification headers")
+            return False
+
+        # 2. Check timestamp freshness (Optional but recommended: prevents replay attacks)
+        request_time = int(timestamp) / 1000
+        if (time.time() - request_time) > 300: # 5 minutes
+            print("Webflow request is too old (potential replay attack)")
+            return False
+
+        # 3. Create the string to sign: timestamp + ":" + raw_body_string
+        string_to_sign = f"{timestamp}:".encode("utf-8") + body_bytes
+
+        # 4. Calculate expected signature
+        expected_signature = hmac.new(
+            key=secret.encode("utf-8"),
+            msg=string_to_sign,
+            digestmod=hashlib.sha256
+        ).hexdigest()
+
+        # 5. Compare signatures safely
+        return hmac.compare_digest(expected_signature, signature)
+
+    except Exception as e:
+        print(f"Signature verification error: {e}")
+        return False
 
 
 def extract_cv_metadata(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -773,8 +816,8 @@ def extract_top_skills_for_translation(
         work_exp = cv_analysis.get("work_experience", {})
         roles = work_exp.get("roles", [])
 
-        # Add roles/responsibilities as skills with context
-        for role in roles[:3]:  # Top 3 roles
+        # Add 1 role/responsibilities as skills with context
+        for role in roles[:1]:  
             skills_with_scores.append({
                 "description": role,
                 "score": 3,
@@ -784,7 +827,7 @@ def extract_top_skills_for_translation(
     # Priority 2: Technical skills from CV analysis
     if cv_analysis and "skills" in cv_analysis:
         tech_skills = cv_analysis.get("skills", {}).get("technical", [])
-        for skill in tech_skills[:5]:
+        for skill in tech_skills[:2]:
             # Check if skill already added (avoid duplicates)
             if not any(skill.lower() in s["description"].lower() for s in skills_with_scores):
                 skills_with_scores.append({
@@ -853,7 +896,7 @@ async def translate_skills_to_corporate(skills_to_translate: List[str]) -> List[
                 {
                     "original": skill,
                     "corporate": skill,
-                    "category": "professional"
+                    "category": "ex. professional, technical, corporate"
                 }
                 for skill in skills_to_translate
             ]
@@ -1260,6 +1303,112 @@ async def list_temp_files():
         "count": len(file_details),
         "files": file_details
     }
+# New function for webflow since it requires an addtional key 
+@app.post("/webhook/webflow")
+async def receive_webflow_webhook(request: Request):
+    """
+    Main webhook endpoint to receive Webflow Form submissions
+    """
+    start_time = time.time()
+    
+    try:
+        # 1. Get Raw Data (Required for verification)
+        body_bytes = await request.body()
+        headers = dict(request.headers)
+        
+        # 2. SECURITY CHECK: Verify Signature
+        secret = os.environ.get("WEBFLOW_WEBHOOK_SECRET")
+        if secret:
+            is_valid = verify_webflow_signature(body_bytes, headers, secret)
+            if not is_valid:
+                print("Security Alert: Invalid Webflow Signature")
+                raise HTTPException(status_code=401, detail="Invalid Signature")
+        else:
+            print("WARNING: WEBFLOW_WEBHOOK_SECRET not set. Skipping check.")
+
+        # 3. Parse JSON
+        try:
+            full_payload = json.loads(body_bytes)
+        except json.JSONDecodeError:
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid JSON"})
+
+        # 4. Extract Core Data (Handle Webflow Structure)
+        # Webflow wraps the real data inside "payload" -> "data"
+        payload_root = full_payload.get("payload", {})
+        form_data = payload_root.get("data", {})
+        
+        # Get IDs
+        submission_id = payload_root.get("id") or full_payload.get("siteId") # Use Webflow's ID
+        
+        # Log the received data
+        log_webhook_data("webflow_submission", form_data, headers)
+
+        # 5. Map Webflow Fields to Your Logic
+        # NOTE: You MUST check your Webflow Form field names! 
+        # They might be "Name" instead of "Full Name". Adjust keys below:
+        mapped_data = {
+            "FullName": form_data.get("Name") or form_data.get("Full Name") or form_data.get("name"),
+            "Email": form_data.get("Email") or form_data.get("email"),
+            "PhoneNo": form_data.get("Phone") or form_data.get("Phone Number"),
+            # Map skills manually or join all text fields if unsure
+            "BasicSkills": [form_data.get("Skills", "")] if form_data.get("Skills") else [],
+            "OtherSkills": form_data.get("Other Skills", ""),
+            "ExperienceLvl": form_data.get("Experience Level", "Just starting out"),
+            # Map Score fields (Ensure your Webflow form sends these as numbers)
+            "People": int(form_data.get("People Score", 3)),
+            "StructuredTask": int(form_data.get("Structure Score", 3)),
+            "InitiativeTask": int(form_data.get("Initiative Score", 3))
+        }
+
+        # Initialize Response
+        response_data = {
+            "status": "success",
+            "submission_id": submission_id,
+            "candidate": {"name": mapped_data["FullName"], "email": mapped_data["Email"]},
+            "errors": []
+        }
+
+        # 6. CV Processing (Handle Webflow File Uploads)
+        cv_url = None
+        # Webflow sends file uploads as a direct URL string in the data key
+        # Check keys like "CV", "Resume", "File"
+        for key, value in form_data.items():
+            if "cv" in key.lower() or "resume" in key.lower() or "upload" in key.lower():
+                if isinstance(value, str) and value.startswith("http"):
+                    cv_url = value
+                    break
+        
+        cv_analysis = None
+        cv_text = None
+        
+        if cv_url:
+            print(f"Downloading CV from: {cv_url}")
+            pdf_bytes = await download_pdf(cv_url)
+            if pdf_bytes:
+                cv_text = extract_text_from_pdf(pdf_bytes)
+                if cv_text:
+                    # Pass mapped_data instead of raw payload
+                    cv_analysis = await analyze_cv_with_openai(cv_text, mapped_data)
+
+        # 7. Calculate Score & Get Jobs
+        # Pass mapped_data because it has the clean keys your functions expect
+        employability_score = calculate_employability_score(cv_analysis, mapped_data)
+        job_recommendations = await get_job_recommendations(mapped_data, cv_analysis)
+        
+        # 8. Send Results to CMS (Same as before)
+        response_data["employability_score"] = employability_score
+        response_data["recommendations"] = {"suggested_roles": job_recommendations}
+        
+        # ... (Include your Top Skills Translation logic here if needed) ...
+
+        webflow_result = await send_to_webflow_cms(submission_id, response_data)
+        
+        # Final Success Response
+        return JSONResponse(status_code=200, content=response_data)
+
+    except Exception as e:
+        print(f"Error processing Webflow webhook: {str(e)}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @app.post("/webhook/fillout")
