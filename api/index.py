@@ -721,6 +721,7 @@ async def get_job_recommendations(
             formatted_jobs.append(format_job_for_response(job, "future"))
 
         print(f"Job recommendations prepared: {len(current_jobs)} current, {len(future_jobs)} future")
+        print(f"Keywords for current:{current_keywords[:5]}, Future keywords:{future_keywords[:2]}")
 
         return formatted_jobs
 
