@@ -314,7 +314,7 @@ async def download_pdf(url: str) -> Optional[bytes]:
     """
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(url)
+            response = await client.get(url, follow_redirects=True)
             response.raise_for_status()
 
             print(f"PDF downloaded successfully - Size: {len(response.content)} bytes")
@@ -1347,16 +1347,17 @@ async def receive_webflow_webhook(request: Request):
         # NOTE: You MUST check your Webflow Form field names! 
         # They might be "Name" instead of "Full Name". Adjust keys below:
         mapped_data = {
-            "FullName": form_data.get("Name") or form_data.get("Full Name") or form_data.get("name"),
+            "FullName": form_data.get("FullName","Unknown"),
             "Email": form_data.get("Email") or form_data.get("email"),
-            "PhoneNo": form_data.get("Phone") or form_data.get("Phone Number"),
+            "DoB": form_data.get("DoB"),
+            "PhoneNo": form_data.get("PhoneNo") or form_data.get("Phone Number"),
             # Map skills manually or join all text fields if unsure
-            "BasicSkills": [form_data.get("Skills", "")] if form_data.get("Skills") else [],
-            "OtherSkills": form_data.get("Other Skills", ""),
-            "ExperienceLvl": form_data.get("Experience Level", "Just starting out"),
+            "BasicSkills": [form_data.get("BasicSkills", "")] if form_data.get("Skills") else [],
+            "OtherSkills": form_data.get("OtherSkills", ""),
+            "ExperienceLvl": form_data.get("ExperienceLvl", "Just starting out"),
             # Map Score fields (Ensure your Webflow form sends these as numbers)
-            "People": int(form_data.get("People Score", 3)),
-            "StructuredTask": int(form_data.get("Structure Score", 3)),
+            "People": int(form_data.get("People", 3)),
+            "StructuredTask": int(form_data.get("StructuredTask", 3)),
             "InitiativeTask": int(form_data.get("Initiative Score", 3))
         }
 
