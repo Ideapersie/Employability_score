@@ -356,11 +356,11 @@ Provide:
 2. Education summary (highest level, field, institutions)
 3. Technical skills identified from CV
 4. Soft skills identified from CV
-5. Career level assessment (entry/mid/senior)
+5. Career level assessment (graduate/entry/mid/senior)
 6. Key strengths (3-5 points)
 7. Areas for improvement (3-5 points)
 8. CV quality score (0-100) based on completeness, clarity, and professionalism
-9. Suggested job roles (List of 3 specific job titles best suited for profile's skills
+9. Suggested job roles (List of 3 specific job titles best suited for profile's skills) - short and simple title allowing for Adzuna API job search
 
 
 Return as JSON with this exact structure:
@@ -383,7 +383,7 @@ Return as JSON with this exact structure:
   "strengths": ["strength1", "strength2"],
   "improvements": ["improvement1", "improvement2"],
   "cv_quality_score": number between 0-100,
-  "suggested_job_roles": ["Role 1", "Role 2", "Role 3] 
+  "suggested_job_roles": ["Role 1", "Role 2", "Role 3] ex. AI Engineer, Python Developer, Graduate Software Engineer
 }}"""
         # Planned changes to model gpt-5-nano
         response = client.chat.completions.create(
@@ -394,8 +394,7 @@ Return as JSON with this exact structure:
             ],
             response_format={"type": "json_object"},
             #temperature=0.7,
-            #max_tokens=1500
-            
+            #max_tokens=15000    
         )
 
         analysis = json.loads(response.choices[0].message.content)
