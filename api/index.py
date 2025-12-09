@@ -571,11 +571,9 @@ def deduplicate_jobs(jobs: List[Dict]) -> List[Dict]:
         company = job.get("company", {}).get("display_name", "Unknown").lower().strip()
         title = job.get("title", "").lower().strip()
 
-        # Create unique key
-        key = f"{company}::{title}"
-
+        # Makes sure its not the same company
         if company not in seen_companies and title and company:
-            seen_companies.add(key)
+            seen_companies.add(company)
             unique_jobs.append(job)
 
     return unique_jobs
@@ -676,8 +674,15 @@ async def get_job_recommendations(
             if jobs:
                 uk_jobs_raw.extend(jobs)
                 
+        # Filter: Remove any job where location contains "London"
+        non_london_jobs = []
+        for job in deduplicate_jobs(uk_jobs_raw):
+            loc_name = job.get('location', {}).get('display_name', '').lower()
+            if "london" not in loc_name:  # <--- THIS IS THE FIX
+                non_london_jobs.append(job)
+                
         # Add top 4 unique UK jobs 
-        current_jobs.extend(deduplicate_jobs(uk_jobs_raw)[:4])
+        current_jobs.extend(deduplicate_jobs(non_london_jobs)[:4])
             
         # Search for future jobs
         future_jobs_london = []
@@ -707,7 +712,14 @@ async def get_job_recommendations(
             if jobs:
                 future_jobs_uk.extend(jobs)
                 
-        future_jobs.extend(deduplicate_jobs(future_jobs_uk)[:1])
+        # Filter: Remove any job where location contains "London"
+        non_future_ldn_jobs = []
+        for job in deduplicate_jobs(future_jobs_uk):
+            loc_name = job.get('location', {}).get('display_name', '').lower()
+            if "london" not in loc_name:  # <--- THIS IS THE FIX
+                non_future_ldn_jobs.append(job)
+                
+        future_jobs.extend(deduplicate_jobs(non_future_ldn_jobs)[:1])
 
         # Format for response
         formatted_jobs = []
