@@ -1074,7 +1074,7 @@ async def send_to_webflow_cms(
                 #"top-skill-2": skill_texts[1],
                 #"top-skill-3": skill_texts[2],
                 "suggested-roles-2": job_summary,
-                "cv-analysis": cv_analysis
+                #"cv-analysis": cv_analysis
                 #"submission-timestamp": datetime.utcnow().isoformat() + "Z"
             }
         }
