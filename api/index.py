@@ -668,7 +668,7 @@ async def get_job_recommendations(
             obs = await search_adzuna_jobs(
                 keywords=[keyword],
                 location="UK",
-                results_per_page=10,
+                results_per_page=30,
                 sort_by="relevance"
             )
             if jobs:
@@ -678,6 +678,7 @@ async def get_job_recommendations(
         non_london_jobs = []
         for job in deduplicate_jobs(uk_jobs_raw):
             loc_name = job.get('location', {}).get('display_name', '').lower()
+            print(f"Loc Name for Current UK jobs: {loc_name}")
             if "london" not in loc_name:  # <--- THIS IS THE FIX
                 non_london_jobs.append(job)
                 
