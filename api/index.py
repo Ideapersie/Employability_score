@@ -1366,6 +1366,9 @@ async def receive_webflow_webhook(request: Request):
             "status": "success",
             "submission_id": submission_id,
             "candidate": {"name": mapped_data["FullName"], "email": mapped_data["Email"]},
+            "Employability Score": 0,
+            "Suggested roles": [],
+            "CV Analysis": [],
             "errors": []
         }
 
@@ -1397,8 +1400,10 @@ async def receive_webflow_webhook(request: Request):
         job_recommendations = await get_job_recommendations(mapped_data, cv_analysis)
         
         # 8. Send Results to CMS (Same as before)
-        response_data["employability_score"] = employability_score
-        response_data["recommendations"] = {"suggested_roles": job_recommendations}
+        response_data["Employability Score"] = employability_score
+        response_data["Suggested roles"] = job_recommendations
+        response_data["CV Analysis"] = cv_analysis
+        
         
         # ... (Include your Top Skills Translation logic here if needed) ...
 
