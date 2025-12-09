@@ -1072,7 +1072,7 @@ async def send_to_webflow_cms(
                 #"top-skill-1": skill_texts[0],
                 #"top-skill-2": skill_texts[1],
                 #"top-skill-3": skill_texts[2],
-                #"job-recommendations": job_summary,
+                "job-recommendations": job_summary,
                 #"submission-timestamp": datetime.utcnow().isoformat() + "Z"
             }
         }
