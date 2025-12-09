@@ -208,3 +208,4 @@ __marimo__/
 
 # Analysis Results (Contains sensitive candidate data)
 analysis_results/
+check_slugs.py

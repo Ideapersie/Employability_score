@@ -1025,6 +1025,7 @@ async def send_to_webflow_cms(
         score = analysis_data.get("Employability Score", {})
         skills = analysis_data.get("top_skills_corporate", [])
         jobs = analysis_data.get("Suggested roles", [])
+        cv_analysis = analysis_data.get("CV Analysis", [])
 
         # Format skills
         skill_texts = [
@@ -1064,15 +1065,16 @@ async def send_to_webflow_cms(
             "isArchived": False,
             "isDraft": False,
             "fieldData": {
-                "name": candidate.get("name", "Unknown"),
                 "slug": slug,
-                #"candidate-email": candidate.get("email", ""),
+                "name": candidate.get("name", "Unknown"),
+                "email": candidate.get("email", ""),
                 "employability-score": str(score.get("total", 0)),
                 #"score-breakdown": score_breakdown,
                 #"top-skill-1": skill_texts[0],
                 #"top-skill-2": skill_texts[1],
                 #"top-skill-3": skill_texts[2],
-                "suggested-roles": job_summary
+                "suggested-roles-2": job_summary,
+                "cv-analysis": cv_analysis
                 #"submission-timestamp": datetime.utcnow().isoformat() + "Z"
             }
         }
