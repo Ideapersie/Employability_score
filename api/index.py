@@ -574,7 +574,7 @@ def deduplicate_jobs(jobs: List[Dict]) -> List[Dict]:
         # Create unique key
         key = f"{company}::{title}"
 
-        if key not in seen_companies and title and company:
+        if company not in seen_companies and title and company:
             seen_companies.add(key)
             unique_jobs.append(job)
 
@@ -682,7 +682,6 @@ async def get_job_recommendations(
         # Search for future jobs
         future_jobs_london = []
         future_jobs_uk = []
-        future_jobs_raw = []
 
         # London based
         for keyword in future_keywords[:1]:
