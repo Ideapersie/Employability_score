@@ -1024,7 +1024,7 @@ async def send_to_webflow_cms(
         candidate = analysis_data.get("candidate", {})
         score = analysis_data.get("Employability Score", {})
         skills = analysis_data.get("top_skills_corporate", [])
-        jobs = analysis_data.get("Suggested Roles", [])
+        jobs = analysis_data.get("Suggested roles", [])
 
         # Format skills
         skill_texts = [
