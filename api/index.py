@@ -669,7 +669,7 @@ async def get_job_recommendations(
         for keyword in current_keywords[:5]:
             obs = await search_adzuna_jobs(
                 keywords=[keyword],
-                location="united kingdom",
+                location="UK",
                 results_per_page=10,
                 sort_by="relevance"
             )
@@ -701,7 +701,7 @@ async def get_job_recommendations(
         for keyword in future_keywords[:1]:
             jobs = await search_adzuna_jobs(
                 keywords=[keyword],
-                location="united kingdom",
+                location="UK",
                 results_per_page=5,
                 sort_by="relevance"
             )
