@@ -1022,9 +1022,9 @@ async def send_to_webflow_cms(
 
         # Extract data
         candidate = analysis_data.get("candidate", {})
-        score = analysis_data.get("employability_score", {})
+        score = analysis_data.get("Employability Score", {})
         skills = analysis_data.get("top_skills_corporate", [])
-        jobs = analysis_data.get("recommendations", {}).get("suggested_roles", [])
+        jobs = analysis_data.get("Suggested Roles", [])
 
         # Format skills
         skill_texts = [
