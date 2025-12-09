@@ -565,18 +565,18 @@ def deduplicate_jobs(jobs: List[Dict]) -> List[Dict]:
     Returns:
         Deduplicated list of jobs
     """
-    seen = set()
+    seen_companies = set()
     unique_jobs = []
 
     for job in jobs:
-        company = job.get("company", {}).get("display_name", "").lower().strip()
+        company = job.get("company", {}).get("display_name", "Unknown").lower().strip()
         title = job.get("title", "").lower().strip()
 
         # Create unique key
         key = f"{company}::{title}"
 
-        if key not in seen and title and company:
-            seen.add(key)
+        if key not in seen_companies and title and company:
+            seen_companies.add(key)
             unique_jobs.append(job)
 
     return unique_jobs
@@ -597,7 +597,7 @@ def format_job_for_response(adzuna_job: Dict, job_type: str) -> Dict:
     salary_min = adzuna_job.get("salary_min")
     salary_max = adzuna_job.get("salary_max")
 
-    if salary_min and salary_max:
+    if salary_min and salary_max and (salary_min != salary_max):
         salary = f"£{salary_min:,.0f} - £{salary_max:,.0f}"
     elif salary_min:
         salary = f"£{salary_min:,.0f}+"
@@ -625,6 +625,8 @@ async def get_job_recommendations(
 ) -> List[Dict[str, Any]]:
     """
     Get job recommendations for a candidate (8 current + 2 future jobs)
+    
+    5 from London, 5 from rest of UK
 
     Args:
         candidate_data: Form submission data with skills and experience
@@ -645,35 +647,69 @@ async def get_job_recommendations(
         print(f"Job search keywords - Current: {current_keywords}, Future: {future_keywords}")
 
         # Search for current jobs (target 10-12 to allow for deduplication)
-        current_jobs_raw = []
+        london_jobs_raw = []
+        uk_jobs_raw = []
+        current_jobs = []
+        future_jobs = []
 
-        # Make 3 searches with top keywords
+        # Make 4 searches for current London
         for keyword in current_keywords[:5]:
             jobs = await search_adzuna_jobs(
                 keywords=[keyword],
                 location="london",
-                results_per_page=20,
+                results_per_page=10,
                 sort_by="relevance"
             )
             if jobs:
-                current_jobs_raw.extend(jobs)
-
+                london_jobs_raw.extend(jobs)
+                
+        # Add top 4 unique London jobs
+        current_jobs.extend(deduplicate_jobs(london_jobs_raw)[:4])
+        
+        # Making 4 Searches for current UK 
+        for keyword in current_keywords[:5]:
+            obs = await search_adzuna_jobs(
+                keywords=[keyword],
+                location="united kingdom",
+                results_per_page=10,
+                sort_by="relevance"
+            )
+            if jobs:
+                uk_jobs_raw.extend(jobs)
+                
+        # Add top 4 unique UK jobs 
+        current_jobs.extend(deduplicate_jobs(uk_jobs_raw)[:4])
+            
         # Search for future jobs
+        future_jobs_london = []
+        future_jobs_uk = []
         future_jobs_raw = []
 
-        for keyword in future_keywords[:2]:
+        # London based
+        for keyword in future_keywords[:1]:
             jobs = await search_adzuna_jobs(
                 keywords=[keyword],
                 location="london",
-                results_per_page=6,
+                results_per_page=5,
                 sort_by="relevance"
             )
             if jobs:
-                future_jobs_raw.extend(jobs)
-
-        # Deduplicate and limit
-        current_jobs = deduplicate_jobs(current_jobs_raw)[:8]
-        future_jobs = deduplicate_jobs(future_jobs_raw)[:2]
+                future_jobs_london.extend(jobs)
+                
+        future_jobs.extend(deduplicate_jobs(future_jobs_london)[:1])
+                
+        # Uk based        
+        for keyword in future_keywords[:1]:
+            jobs = await search_adzuna_jobs(
+                keywords=[keyword],
+                location="united kingdom",
+                results_per_page=5,
+                sort_by="relevance"
+            )
+            if jobs:
+                future_jobs_uk.extend(jobs)
+                
+        future_jobs.extend(deduplicate_jobs(future_jobs_uk)[:1])
 
         # Format for response
         formatted_jobs = []
