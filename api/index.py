@@ -1147,14 +1147,12 @@ async def send_to_webflow_cms(
         print(f"Error sending to Webflow CMS: {str(e)}")
         return None
 """
+
 async def send_to_webflow_cms(
     submission_id: str,
     analysis_data: Dict[str, Any]
 ) -> Optional[Dict[str, str]]:
-    """
-    Sends results to Webflow CMS (V2 API Fix).
-    Wraps payload in 'items' array and ensures strict string typing.
-    """
+
     try:
         api_token = os.environ.get("WEBFLOW_API_TOKEN")
         collection_id = os.environ.get("WEBFLOW_COLLECTION_ID")
@@ -1236,7 +1234,7 @@ async def send_to_webflow_cms(
             webflow_id = created_items[0].get("id") if created_items else "unknown"
             
             # Construct results URL
-            results_url = f"www.ukngn.com/form-results/applicant-006"
+            results_url = f"https://ukngn.com/api/webhook/results"
             
             print(f"Successfully sent to Webflow CMS: {webflow_id}")
             return {
@@ -1250,6 +1248,7 @@ async def send_to_webflow_cms(
     except Exception as e:
         print(f"Error sending to Webflow CMS: {str(e)}")
         return None
+
 
 def calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], form_data: Dict[str, Any]) -> Dict[str, Any]:
     """
