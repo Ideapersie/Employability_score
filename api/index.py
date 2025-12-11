@@ -1001,21 +1001,21 @@ Ensure you return exactly {len(skills_to_translate)} item(s) in the array."""
             for skill in skills_to_translate
         ]
 
-
+"""
 async def send_to_webflow_cms(
     submission_id: str,
     analysis_data: Dict[str, Any]
 ) -> Optional[Dict[str, str]]:
-    """
-    Send analysis results to Webflow CMS to create a results page
+    
+    #Send analysis results to Webflow CMS to create a results page
 
-    Args:
-        submission_id: Unique submission ID
-        analysis_data: Complete analysis data from webhook
+    #Args:
+        #submission_id: Unique submission ID
+        #analysis_data: Complete analysis data from webhook
 
-    Returns:
-        Dict with webflow_item_id and results_url, or None if failed
-    """
+    #Returns:
+        #Dict with webflow_item_id and results_url, or None if failed
+    
     try:
         api_token = os.environ.get("WEBFLOW_API_TOKEN")
         collection_id = os.environ.get("WEBFLOW_COLLECTION_ID")
@@ -1109,6 +1109,99 @@ async def send_to_webflow_cms(
         return None
     except Exception as e:
         print(f"Error sending to Webflow CMS: {str(e)}")
+        return None
+"""
+async def send_to_webflow_cms(
+    submission_id: str,
+    analysis_data: Dict[str, Any]
+) -> Optional[Dict[str, str]]:
+    """
+    Sends results to Webflow CMS.
+    Updated to read 'Employability Score' and 'Suggested roles' keys.
+    """
+    try:
+        api_token = os.environ.get("WEBFLOW_API_TOKEN")
+        collection_id = os.environ.get("WEBFLOW_COLLECTION_ID")
+
+        if not api_token or not collection_id:
+            print("Webflow credentials not configured")
+            return None
+
+        # 1. Extract Data using YOUR CUSTOM KEYS
+        candidate = analysis_data.get("candidate", {})
+        
+        # KEY 1: "Employability Score" (Dict with 'total')
+        score_data = analysis_data.get("Employability Score", {}) 
+        
+        # KEY 2: "Suggested roles" (List of jobs)
+        jobs = analysis_data.get("Suggested roles", []) 
+        
+        # KEY 3: Skills
+        skills = analysis_data.get("top_skills_corporate", []) 
+
+        # Format skills safely
+        skill_texts = [
+            f"{s.get('corporate', s.get('original', 'N/A'))}"
+            for s in skills[:3]
+        ]
+        while len(skill_texts) < 3: skill_texts.append("")
+
+        # Format job recommendations
+        job_summary = "\n".join([
+            f"- {job.get('title', 'N/A')} at {job.get('company', 'N/A')}"
+            for job in jobs[:5]
+        ])
+
+        slug = f"{submission_id}"
+        url = f"https://api.webflow.com/v2/collections/{collection_id}/items"
+        headers = {
+            "Authorization": f"Bearer {api_token}",
+            "Content-Type": "application/json",
+            "accept": "application/json"
+        }
+
+        # 2. Map to Webflow CMS Slugs
+        # IMPORTANT: Replace these keys with the ACTUAL SLUGS from your check_slugs.py script
+        body = {
+            "isArchived": False,
+            "isDraft": False,
+            "fieldData": {
+                "name": candidate.get("name", "Unknown"),
+                "slug": slug,
+                "candidate-email": candidate.get("email", ""),
+                
+                # Mapping 'Employability Score' -> 'employability-score'
+                "employability-score": str(score_data.get("total", 0)), 
+                
+                # Mapping 'Suggested roles' -> 'job-recommendations-2' (or whatever your slug is)
+                "job-recommendations-2": job_summary, 
+                
+                "top-skill-1": skill_texts[0],
+                "top-skill-2": skill_texts[1],
+                "top-skill-3": skill_texts[2],
+                "submission-timestamp": datetime.utcnow().isoformat() + "Z"
+            }
+        }
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(url, json=body, headers=headers)
+            response.raise_for_status()
+            result = response.json()
+            
+            # Use just the ID for the URL since we made slug = id
+            results_url = f"/form-results/form-result-page/{slug}" 
+            
+            print(f"Successfully sent to Webflow CMS: {result.get('id')}")
+            return {
+                "webflow_item_id": result.get("id"),
+                "results_url": results_url
+            }
+
+    except Exception as e:
+        print(f"Error sending to Webflow CMS: {str(e)}")
+        # Check for 400 errors specifically to help debug slug issues
+        if "response" in locals() and response.status_code == 400:
+             print(f"Webflow Validation Error: {response.text}")
         return None
 
 
@@ -1310,12 +1403,13 @@ async def list_temp_files():
         "count": len(file_details),
         "files": file_details
     }
+"""
 # New function for webflow since it requires an addtional key 
 @app.post("/webhook/webflow")
 async def receive_webflow_webhook(request: Request):
-    """
-    Main webhook endpoint to receive Webflow Form submissions
-    """
+    
+    #Main webhook endpoint to receive Webflow Form submissions
+    
     start_time = time.time()
     
     try:
@@ -1422,7 +1516,122 @@ async def receive_webflow_webhook(request: Request):
     except Exception as e:
         print(f"Error processing Webflow webhook: {str(e)}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+"""
 
+@app.post("/webhook/webflow")
+async def receive_webflow_webhook(request: Request):
+    """
+    Main webhook endpoint to receive Webflow Form submissions
+    """
+    start_time = time.time()
+    
+    try:
+        # 1. Get Raw Data (Required for verification)
+        body_bytes = await request.body()
+        headers = dict(request.headers)
+        
+        # 2. SECURITY CHECK: Verify Signature
+        secret = os.environ.get("WEBFLOW_WEBHOOK_SECRET")
+        if secret:
+            is_valid = verify_webflow_signature(body_bytes, headers, secret)
+            if not is_valid:
+                print("Security Alert: Invalid Webflow Signature")
+                raise HTTPException(status_code=401, detail="Invalid Signature")
+        else:
+            print("WARNING: WEBFLOW_WEBHOOK_SECRET not set. Skipping check.")
+
+        # 3. Parse JSON
+        try:
+            full_payload = json.loads(body_bytes)
+        except json.JSONDecodeError:
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid JSON"})
+
+        # 4. Extract Core Data
+        # Webflow wraps data in "payload" -> "data"
+        payload_root = full_payload.get("payload", {})
+        form_data = payload_root.get("data", {})
+        submission_id = payload_root.get("id") or full_payload.get("siteId")
+        
+        # Log the received data
+        log_webhook_data("webflow_submission", form_data, headers)
+
+        # 5. Map Webflow Fields to Internal Logic
+        # Update these keys to match YOUR Webflow form's exact field names
+        mapped_data = {
+            "FullName": form_data.get("Name") or form_data.get("Full Name") or form_data.get("name"),
+            "Email": form_data.get("Email") or form_data.get("email"),
+            "DoB": form_data.get("Date of Birth") or form_data.get("DoB"),
+            "PhoneNo": form_data.get("Phone") or form_data.get("Phone Number"),
+            # Skills often come as a single string or comma-separated list
+            "BasicSkills": [s.strip() for s in form_data.get("Skills", "").split(',')] if form_data.get("Skills") else [],
+            "OtherSkills": form_data.get("Other Skills", ""),
+            "ExperienceLvl": form_data.get("Experience Level", "Just starting out"),
+            # Ensure scores are integers (default to 3 if missing)
+            "People": int(form_data.get("People Score") or 3),
+            "StructuredTask": int(form_data.get("Structure Score") or 3),
+            "InitiativeTask": int(form_data.get("Initiative Score") or 3)
+        }
+
+        # Initialize Response with your PREFERRED keys
+        response_data = {
+            "status": "success",
+            "submission_id": submission_id,
+            "candidate": {"name": mapped_data["FullName"], "email": mapped_data["Email"]},
+            "Employability Score": None,  # Capitalized as requested
+            "Suggested roles": [],        # Capitalized as requested
+            "CV Analysis": None,          # Capitalized as requested
+            "top_skills_corporate": [],
+            "errors": []
+        }
+
+        # 6. CV Processing
+        cv_url = None
+        for key, value in form_data.items():
+            if "cv" in key.lower() or "resume" in key.lower() or "upload" in key.lower():
+                if isinstance(value, str) and value.startswith("http"):
+                    cv_url = value
+                    break
+        
+        cv_analysis = None
+        cv_text = None
+        
+        if cv_url:
+            print(f"Downloading CV from: {cv_url}")
+            # FIX: Added follow_redirects=True to handle Webflow 302 redirects
+            pdf_bytes = await download_pdf(cv_url) 
+            if pdf_bytes:
+                cv_text = extract_text_from_pdf(pdf_bytes)
+                if cv_text:
+                    cv_analysis = await analyze_cv_with_openai(cv_text, mapped_data)
+
+        # 7. Calculate Score & Get Jobs
+        employability_score = calculate_employability_score(cv_analysis, mapped_data)
+        job_recommendations = await get_job_recommendations(mapped_data, cv_analysis)
+        
+        # 8. Assign Data to Response
+        response_data["Employability Score"] = employability_score
+        response_data["Suggested roles"] = job_recommendations
+        response_data["CV Analysis"] = cv_analysis
+
+        # 9. Top Skills Translation (Restored logic)
+        if cv_analysis and cv_text:
+            top_skills_raw = extract_top_skills_for_translation(mapped_data, cv_analysis, cv_text)
+            if top_skills_raw:
+                top_skills_corporate = await translate_skills_to_corporate(top_skills_raw)
+                response_data["top_skills_corporate"] = top_skills_corporate
+
+        # 10. Send to Webflow CMS
+        # This function handles the slug mapping
+        webflow_result = await send_to_webflow_cms(submission_id, response_data)
+        
+        if webflow_result:
+            response_data["webflow_results_url"] = webflow_result.get("results_url")
+
+        return JSONResponse(status_code=200, content=response_data)
+
+    except Exception as e:
+        print(f"Error processing Webflow webhook: {str(e)}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 @app.post("/webhook/fillout")
 async def receive_fillout_webhook(request: Request):
