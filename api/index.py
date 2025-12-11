@@ -403,7 +403,7 @@ Provide:
 6. Key strengths (3-5 points)
 7. Areas for improvement (3-5 points)
 8. CV quality score (0-100) based on completeness, clarity, and professionalism
-9. Suggested job roles (List of 3 specific job titles best suited for profile's skills) - short and simple title allowing for Adzuna API job search
+9. Suggested job roles (List of 3 specific job titles best suited for profile's skills) - short and simple title allowing for Adzuna API job search (No bracket answer)
 
 
 Return as JSON with this exact structure:
@@ -710,7 +710,13 @@ async def get_job_recommendations(
         for keyword in current_keywords[:5]:
             obs = await search_adzuna_jobs(
                 keywords=[keyword],
-                location="UK",
+                location=[
+                    "birmingham",
+                    "glasglow",
+                    "manchester",
+                    "leeds",
+                    "liverpool"
+                ],
                 results_per_page=30,
                 sort_by="relevance"
             )
@@ -749,7 +755,13 @@ async def get_job_recommendations(
         for keyword in future_keywords[:1]:
             jobs = await search_adzuna_jobs(
                 keywords=[keyword],
-                location="UK",
+                location=[
+                    "birmingham",
+                    "glasglow",
+                    "manchester",
+                    "leeds",
+                    "liverpool"
+                ],
                 results_per_page=5,
                 sort_by="relevance"
             )
@@ -1182,11 +1194,12 @@ def calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], for
     if other_skills and other_skills.strip():
         skills_count += len(other_skills.split(","))
 
+    # Needs to be  changed *** THiss cant be count-based
     breakdown["skills_match"] = min(25, skills_count * 3)
 
     # 3. Experience Level (0-25 points)
     experience_mapping = {
-        "Just starting out": 5,
+        "Just starting out": 6,
         "Some experience": 12,
         "Experienced": 18,
         "Very experienced": 25
