@@ -1152,7 +1152,10 @@ async def send_to_webflow_cms(
     submission_id: str,
     analysis_data: Dict[str, Any]
 ) -> Optional[Dict[str, str]]:
-
+    """
+    Sends results to Webflow CMS using the LATEST PlainText schema.
+    Slugs updated to match image_1dd993.png (analysis-2, etc.)
+    """
     try:
         api_token = os.environ.get("WEBFLOW_API_TOKEN")
         collection_id = os.environ.get("WEBFLOW_COLLECTION_ID")
@@ -1163,31 +1166,36 @@ async def send_to_webflow_cms(
 
         # 1. Extract Data
         candidate = analysis_data.get("candidate", {})
-        score_data = analysis_data.get("Employability Score", {}) 
-        jobs = analysis_data.get("Suggested roles", []) 
-        skills = analysis_data.get("top_skills_corporate", []) 
+        score_data = analysis_data.get("Employability Score", {})
+        cv_analysis = analysis_data.get("CV Analysis") or {} 
+        jobs = analysis_data.get("Suggested roles", [])
 
-        # Format skills safely
-        skill_texts = [
-            f"{s.get('corporate', s.get('original', 'N/A'))}"
-            for s in skills[:3]
-        ]
-        while len(skill_texts) < 3: skill_texts.append("")
+        # 2. Helper: Convert List to Plain Text (No HTML tags!)
+        def list_to_text(items):
+            if not items:
+                return "None available."
+            # Creates a simple text list:
+            # • Item 1
+            # • Item 2
+            return "\n".join([f"• {item}" for item in items])
 
-        # Format job recommendations
-        job_summary = "\n".join([
-            f"- {job.get('title', 'N/A')} at {job.get('company', 'N/A')}"
-            for job in jobs[:5]
-        ])
-
-        # FIX 1: Handle Name Validation (Ensure it's never None)
-        # .get("name") or "Unknown" ensures if value is None, it becomes "Unknown"
-        candidate_name = candidate.get("name") or "Unknown"
-        candidate_email = candidate.get("email") or ""
+        # 3. Format Specific Fields
         
-        slug = f"{submission_id}"
+        # Job Recommendations
+        job_items = [
+            f"{job.get('title', 'Role')} at {job.get('company', 'Company')} ({job.get('location', 'UK')})"
+            for job in jobs[:5]
+        ]
+        recommendations_text = list_to_text(job_items)
 
-        # FIX 2: Correct URL for V2 (V2 uses /bulk or /items but expects 'items' array)
+        # Strengths & Improvements
+        strengths_text = list_to_text(cv_analysis.get("strengths", []))
+        improvements_text = list_to_text(cv_analysis.get("improvements", []))
+
+        # Analysis Summary
+        analysis_text = cv_analysis.get("work_experience", {}).get("summary", "No summary generated.")
+
+        # 4. Construct Payload with Correct Slugs
         url = f"https://api.webflow.com/v2/collections/{collection_id}/items"
         
         headers = {
@@ -1196,45 +1204,43 @@ async def send_to_webflow_cms(
             "accept": "application/json"
         }
 
-        # FIX 3: V2 Payload Structure
-        # The API expects an object with an 'items' list
         body = {
             "items": [
                 {
                     "isArchived": False,
                     "isDraft": False,
                     "fieldData": {
-                        "name": str(candidate_name), # Explicitly cast to string
-                        "slug": str(slug),
-                        "candidate-email": str(candidate_email),
+                        # System Fields
+                        "name": str(candidate.get("name") or "Unknown Candidate"),
+                        "slug": str(submission_id),
                         
-                        # Ensure numeric values are converted to strings if your CMS field is Text
-                        "employability-score": str(score_data.get("total", 0)), 
-                        "job-recommendations-2": str(job_summary), 
-                        "top-skill-1": str(skill_texts[0]),
-                        "top-skill-2": str(skill_texts[1]),
-                        "top-skill-3": str(skill_texts[2]),
-                        "submission-timestamp": datetime.utcnow().isoformat() + "Z"
+                        # Custom Fields (Matching image_1dd993.png)
+                        "email": str(candidate.get("email") or ""),
+                        "score": int(score_data.get("total", 0)), 
+                        "received-at": datetime.utcnow().isoformat(),
+                        
+                        # Note: These use the "-2" suffix from your screenshot
+                        "analysis-2": str(analysis_text),
+                        "recommendations-2": str(recommendations_text),
+                        "strengths-2": str(strengths_text),
+                        "areas-for-improvement-2": str(improvements_text)
                     }
                 }
             ]
         }
 
+        # 5. Send Request
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.post(url, json=body, headers=headers)
             
-            # Raise status to trigger exception block on 400/500
             response.raise_for_status()
             
             result = response.json()
-            
-            # V2 returns specific structure for bulk items
-            # Usually: { "items": [ { "id": "...", ... } ] }
             created_items = result.get("items", [])
             webflow_id = created_items[0].get("id") if created_items else "unknown"
             
-            # Construct results URL
-            results_url = f"https://ukngn.com/api/webhook/results"
+            # Results URL
+            results_url = f"www.ukngn.com/application-results/application-result-page"
             
             print(f"Successfully sent to Webflow CMS: {webflow_id}")
             return {
@@ -1248,7 +1254,6 @@ async def send_to_webflow_cms(
     except Exception as e:
         print(f"Error sending to Webflow CMS: {str(e)}")
         return None
-
 
 def calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], form_data: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -1533,7 +1538,7 @@ async def receive_webflow_webhook(request: Request):
 async def receive_webflow_webhook(request: Request):
     """
     Main webhook endpoint to receive Webflow Form submissions
-    Updated to use WebflowWebhookPayload Pydantic model
+    Updated to handle PascalCase keys and Direct CV URL.
     """
     start_time = time.time()
     
@@ -1542,7 +1547,7 @@ async def receive_webflow_webhook(request: Request):
         body_bytes = await request.body()
         headers = dict(request.headers)
         
-        # 2. SECURITY CHECK (Keep your existing signature logic)
+        # 2. SECURITY CHECK
         secret = os.environ.get("WEBFLOW_WEBHOOK_SECRET")
         if secret:
             is_valid = verify_webflow_signature(body_bytes, headers, secret)
@@ -1557,63 +1562,42 @@ async def receive_webflow_webhook(request: Request):
             return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid JSON"})
 
         # 4. Extract Core Data
-        # Webflow structure is: { "triggerType": "form_submission", "payload": { "data": { ...YOUR JSON... } } }
         payload_root = full_payload.get("payload", {})
         raw_form_data = payload_root.get("data", {})
         
-        # Fallback: If the user sends the flat JSON directly (testing mode), use full_payload
-        if not raw_form_data and "fullName" in full_payload:
+        # Fallback for direct testing
+        if not raw_form_data and "FullName" in full_payload:
             raw_form_data = full_payload
 
         submission_id = payload_root.get("id") or full_payload.get("siteId") or f"sub-{int(time.time())}"
         
-        # Log the received data
         log_webhook_data("webflow_submission", raw_form_data, headers)
 
-        # 5. VALIDATE WITH PYDANTIC (The Fix)
-        try:
-            # This converts the raw dictionary into your nice python class
-            webflow_data = WebflowWebhookPayload(**raw_form_data)
-        except Exception as e:
-            print(f"Validation Warning: {e}")
-            # If validation fails, try to proceed with raw data or return error
-            # For now, we will try to construct a partial model to keep going
-            webflow_data = WebflowWebhookPayload(
-                fullName=raw_form_data.get("fullName", "Unknown"), 
-                email=raw_form_data.get("email", "no-email@example.com")
-            )
+        # 5. VALIDATE WITH PYDANTIC (Using Updated Model)
+        webflow_data = WebflowWebhookPayload(**raw_form_data)
 
-        # 6. Map to Internal Logic (Standardized Keys)
-        # We now use 'webflow_data' object instead of 'form_data.get()' guesses
-        
-        # Handle lists vs strings for skills
+        # 6. Map to Internal Logic
+        # Handle skills which might be a comma string "Python, SQL"
         basic_skills = webflow_data.skills
         if isinstance(basic_skills, str):
             basic_skills = [s.strip() for s in basic_skills.split(",")]
 
-        soft_skills = webflow_data.softSkills
-        if isinstance(soft_skills, str):
-            soft_skills = [s.strip() for s in soft_skills.split(",")]
-
         mapped_data = {
             "FullName": webflow_data.fullName,
             "Email": webflow_data.email,
-            "DoB": "N/A", # Webflow payload didn't have DoB in your example
             "PhoneNo": webflow_data.phone,
             "Linkedin": webflow_data.linkedin,
-            
             "BasicSkills": basic_skills,
             "OtherSkills": webflow_data.otherSkills,
             "ExperienceLvl": webflow_data.experience,
-            "SoftSkills": soft_skills,
+            "SoftSkills": [], # Log showed "false", safely ignore
             
-            # Use the helper method to convert "strongly-agree" -> 5
+            # Convert scores using the helper
             "People": webflow_data.get_score(webflow_data.workingWithPeople),
             "StructuredTask": webflow_data.get_score(webflow_data.clearStructure),
             "InitiativeTask": webflow_data.get_score(webflow_data.takingInitiative)
         }
 
-        # Initialize Response
         response_data = {
             "status": "success",
             "submission_id": submission_id,
@@ -1626,21 +1610,13 @@ async def receive_webflow_webhook(request: Request):
         }
 
         # 7. CV Processing
-        # Your example had "cvFileName" but usually for analysis we need a URL
-        # Webflow usually sends a URL in a field if it's a file upload.
-        # Check if any field looks like a URL or use raw_form_data for the file search loop
-        cv_url = None
-        
-        # Check the raw data loop just in case the file URL is in a different field
-        for key, value in raw_form_data.items():
-            if isinstance(value, str) and value.startswith("http") and (".pdf" in value or ".doc" in value):
-                cv_url = value
-                break
+        # The log shows "CV": "https://webflow.com/files/..."
+        cv_url = webflow_data.cv_url
         
         cv_analysis = None
         cv_text = None
         
-        if cv_url:
+        if cv_url and cv_url.startswith("http"):
             print(f"Downloading CV from: {cv_url}")
             pdf_bytes = await download_pdf(cv_url) 
             if pdf_bytes:
@@ -1674,9 +1650,8 @@ async def receive_webflow_webhook(request: Request):
 
     except Exception as e:
         print(f"Error processing Webflow webhook: {str(e)}")
-        # Print the traceback for debugging
-        import traceback
-        traceback.print_exc()
+        # import traceback
+        # traceback.print_exc()
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 @app.post("/webhook/fillout")
