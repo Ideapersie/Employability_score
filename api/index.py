@@ -691,6 +691,8 @@ async def get_job_recommendations(
         uk_jobs_raw = []
         current_jobs = []
         future_jobs = []
+        
+        target_cities = ["birmingham", "glasgow", "manchester", "leeds", "liverpool"]
 
         # Make 4 searches for current London
         for keyword in current_keywords[:5]:
@@ -708,20 +710,15 @@ async def get_job_recommendations(
         
         # Making 4 Searches for current UK 
         for keyword in current_keywords[:5]:
-            obs = await search_adzuna_jobs(
-                keywords=[keyword],
-                location=[
-                    "birmingham",
-                    "glasglow",
-                    "manchester",
-                    "leeds",
-                    "liverpool"
-                ],
-                results_per_page=30,
-                sort_by="relevance"
-            )
-            if jobs:
-                uk_jobs_raw.extend(jobs)
+            for city in target_cities: 
+                jobs = await search_adzuna_jobs(
+                    keywords=[keyword],
+                    location=city,
+                    results_per_page=5,
+                    sort_by="relevance"
+                )
+                if jobs:
+                    uk_jobs_raw.extend(jobs)
                 
         # Filter: Remove any job where location contains "London"
         non_london_jobs = []
@@ -753,18 +750,13 @@ async def get_job_recommendations(
                 
         # Uk based        
         for keyword in future_keywords[:1]:
-            jobs = await search_adzuna_jobs(
-                keywords=[keyword],
-                location=[
-                    "birmingham",
-                    "glasglow",
-                    "manchester",
-                    "leeds",
-                    "liverpool"
-                ],
-                results_per_page=5,
-                sort_by="relevance"
-            )
+            for city in target_cities: 
+                jobs = await search_adzuna_jobs(
+                    keywords=[keyword],
+                    location=city,
+                    results_per_page=5,
+                    sort_by="relevance"
+                )
             if jobs:
                 future_jobs_uk.extend(jobs)
                 
