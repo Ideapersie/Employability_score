@@ -91,12 +91,22 @@ class WebhookPayload(BaseModel):
     Flexible model for Fillout webhook payload
     Structure will be discovered from first real webhook
     """
-    data: Optional[Dict[str, Any]] = None
-    submission: Optional[Dict[str, Any]] = None
-    questions: Optional[List[Dict[str, Any]]] = None
+    fullName: str
+    email: str
+    phone: str
+    linkedin: str
+    skills: List[str]
+    otherSkills: str
+    experience: str
+    softSkills: List[str]
+    workingWithPeople: int = Field(ge=1, le=5)
+    clearStructure: int = Field(ge=1, le=5)
+    takingInitiative: int = Field(ge=1, le=5)
+    cvFileName: List[Dict[str, str]]
+    submittedAt: str
 
     class Config:
-        extra = "allow"  # Allow additional fields not defined
+        extra = "allow"  # Allow additional fields
 
 
 class FilloutWebhookPayload(BaseModel):
@@ -1189,7 +1199,8 @@ async def send_to_webflow_cms(
             result = response.json()
             
             # Use just the ID for the URL since we made slug = id
-            results_url = f"/form-results/form-result-page/{slug}" 
+            results_url = f"www.ukngn.com/form-results/applicant-006"
+            #f"/form-results/form-result-page/{slug}" 
             
             print(f"Successfully sent to Webflow CMS: {result.get('id')}")
             return {
