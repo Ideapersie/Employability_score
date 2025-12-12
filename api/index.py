@@ -109,6 +109,31 @@ class WebhookPayload(BaseModel):
         extra = "allow"  # Allow additional fields
         
 class WebflowWebhookPayload(BaseModel):
+    """
+    Validates data matching the PascalCase keys from your actual Webflow log.
+    """
+    # 1. Map Keys using 'alias'
+    fullName: str = Field(..., alias="FullName")
+    email: str = Field(..., alias="Email")
+    phone: Optional[str] = Field(None, alias="PhoneNo")
+    linkedin: Optional[str] = Field(None, alias="Linkedin")
+    
+    # Skills
+    skills: Union[List[str], str] = Field([], alias="BasicSkills")
+    otherSkills: Optional[str] = Field("", alias="OtherSkills")
+    
+    experience: str = Field("Just starting out", alias="ExperienceLvl")
+    softSkills: Union[List[str], str] = Field([], alias="SoftSkills")
+    
+    # 2. Map Personality Scores (People -> workingWithPeople)
+    # Accepts string "2" or int 2. Defaults to "3" if missing.
+    workingWithPeople: Union[str, int] = Field("3", alias="People")
+    clearStructure: Union[str, int] = Field("3", alias="StructuredTask")
+    takingInitiative: Union[str, int] = Field("3", alias="InitiativeTask")
+    
+    # 3. Handle CV URL (Log shows it comes as "CV")
+    cv_url: Optional[str] = Field(None, alias="CV")
+    """
     fullName: str
     email: str
     phone: Optional[str] = None
@@ -133,6 +158,7 @@ class WebflowWebhookPayload(BaseModel):
 
     class Config:
         extra = "allow"  # Allow additional fields
+    """
 
 
 class FilloutWebhookPayload(BaseModel):
