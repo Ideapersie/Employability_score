@@ -220,6 +220,8 @@ def log_webhook_data(
         },
         "payload": data,  # Full payload for analysis
     }
+    
+    
 
     # Add extra info if provided
     if extra_info:
@@ -1586,6 +1588,10 @@ async def receive_webflow_webhook(request: Request):
             full_payload = json.loads(body_bytes)
         except json.JSONDecodeError:
             return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid JSON"})
+        
+        print(f"Request body: {request.body}")
+        print(f"Request JSON: {request.json()}")
+        print(f"Content-Type: {request.headers.get('content-type')}")
 
         # 4. Extract Core Data
         payload_root = full_payload.get("payload", {})
