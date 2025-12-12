@@ -1574,7 +1574,8 @@ async def receive_webflow_webhook(request: Request):
         log_webhook_data("webflow_submission", raw_form_data, headers)
 
         # 5. VALIDATE WITH PYDANTIC (Using Updated Model)
-        webflow_data = WebflowWebhookPayload(**raw_form_data)
+        #webflow_data = WebflowWebhookPayload(**raw_form_data)
+        webflow_data = FilloutWebhookPayload(**raw_form_data)
 
         # 6. Map to Internal Logic
         # Handle skills which might be a comma string "Python, SQL"
