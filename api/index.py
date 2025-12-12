@@ -1051,16 +1051,8 @@ async def send_to_webflow_cms(
         cv_analysis = analysis_data.get("CV Analysis") or {} 
         jobs = analysis_data.get("Suggested roles", [])
 
-        # 2. Helper: Convert List to Plain Text (No HTML tags!)
-        def list_to_text(items):
-            if not items:
-                return "None available."
-            # Creates a simple text list:
-            # • Item 1
-            # • Item 2
-            return "\n".join([f"• {item}" for item in items])
 
-        # 3. Format Specific Fields
+        # 2. Format Specific Fields
         
         # Job Recommendations
         job_items = [
@@ -1076,7 +1068,7 @@ async def send_to_webflow_cms(
         # Analysis Summary
         analysis_text = cv_analysis.get("work_experience", {}).get("summary", "No summary generated.")
 
-        # 4. Construct Payload with Correct Slugs
+        # 3. Construct Payload with Correct Slugs
         url = f"https://api.webflow.com/v2/collections/{collection_id}/items"
         
         headers = {
@@ -1110,7 +1102,7 @@ async def send_to_webflow_cms(
             ]
         }
 
-        # 5. Send Request
+        # 4. Send Request
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.post(url, json=body, headers=headers)
             
@@ -1128,6 +1120,7 @@ async def send_to_webflow_cms(
                 "webflow_item_id": webflow_id,
                 "results_url": results_url
             }
+            
 
     except httpx.HTTPStatusError as e:
         print(f"Webflow API Error {e.response.status_code}: {e.response.text}")
@@ -1221,6 +1214,14 @@ def calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], for
         "percentile": percentile
     }
 
+# Helper method to analyze the data in print log 
+def save_analysis_to_json(submission_id: str, analysis_data: Dict[str, Any]):
+    """
+    PRINTS THE FULL DATA TO VERCEL LOGS
+    """
+    print(f"\n=== COMPLETE DATA OUTPUT FOR {submission_id} ===")
+    print(json.dumps(analysis_data, indent=2, default=str))
+    print(f"================================================\n")
 
 # ============================================================================
 # API ENDPOINTS
@@ -1300,6 +1301,7 @@ async def list_temp_files():
         "count": len(file_details),
         "files": file_details
     }
+
 
 
 @app.post("/webhook/webflow")
@@ -1410,6 +1412,9 @@ async def receive_webflow_webhook(request: Request):
 
         # 11. Send to Webflow CMS
         webflow_result = await send_to_webflow_cms(submission_id, response_data)
+        
+        # 5. LOG THE FULL DATA TO CONSOLE
+        save_analysis_to_json(response_data["submission_id"], response_data)
         
         if webflow_result:
             response_data["webflow_results_url"] = webflow_result.get("results_url")
@@ -1666,7 +1671,7 @@ async def receive_fillout_webhook(request: Request):
             "errors": response_data["errors"]
         }
 
-        save_analysis_to_json(submission_id, complete_analysis)
+        #save_analysis_to_json(submission_id, complete_analysis)
 
         print(f"Webhook processed successfully - Submission: {submission_id}, Score: {employability_score['total']}/100, Time: {processing_time}ms")
 
