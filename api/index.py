@@ -1356,7 +1356,7 @@ async def root():
         "version": "1.0.0",
         "endpoints": {
             "health": "/health",
-            "webhook": "/webhook/fillout",
+            "webhook": "/webhook/webflow",
             "docs": "/docs"
         },
         "environment": get_environment_status()
@@ -1419,9 +1419,9 @@ async def list_temp_files():
         "count": len(file_details),
         "files": file_details
     }
-"""
+
 # New function for webflow since it requires an addtional key 
-@app.post("/webhook/webflow")
+@app.post("/webhook/newflow")
 async def receive_webflow_webhook(request: Request):
     
     #Main webhook endpoint to receive Webflow Form submissions
@@ -1532,7 +1532,7 @@ async def receive_webflow_webhook(request: Request):
     except Exception as e:
         print(f"Error processing Webflow webhook: {str(e)}")
         return JSONResponse(status_code=500, content={"error": str(e)})
-"""
+
 
 @app.post("/webhook/webflow")
 async def receive_webflow_webhook(request: Request):
