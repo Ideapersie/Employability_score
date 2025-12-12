@@ -1625,9 +1625,9 @@ async def receive_webflow_webhook(request: Request):
             "SoftSkills": [], # Log showed "false", safely ignore
             
             # Convert scores using the helper
-            "People": webflow_data.get_score(webflow_data.workingWithPeople),
-            "StructuredTask": webflow_data.get_score(webflow_data.clearStructure),
-            "InitiativeTask": webflow_data.get_score(webflow_data.takingInitiative)
+            "People": webflow_data.workingWithPeople,
+            "StructuredTask": webflow_data.clearStructure,
+            "InitiativeTask": webflow_data.takingInitiative
         }
 
         response_data = {
