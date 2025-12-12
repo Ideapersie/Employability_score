@@ -1028,116 +1028,6 @@ Ensure you return exactly {len(skills_to_translate)} item(s) in the array."""
             for skill in skills_to_translate
         ]
 
-"""
-async def send_to_webflow_cms(
-    submission_id: str,
-    analysis_data: Dict[str, Any]
-) -> Optional[Dict[str, str]]:
-    
-    #Send analysis results to Webflow CMS to create a results page
-
-    #Args:
-        #submission_id: Unique submission ID
-        #analysis_data: Complete analysis data from webhook
-
-    #Returns:
-        #Dict with webflow_item_id and results_url, or None if failed
-    
-    try:
-        api_token = os.environ.get("WEBFLOW_API_TOKEN")
-        collection_id = os.environ.get("WEBFLOW_COLLECTION_ID")
-
-        if not api_token or not collection_id:
-            print("Webflow credentials not configured")
-            return None
-
-        # Extract data
-        candidate = analysis_data.get("candidate", {})
-        score = analysis_data.get("Employability Score", {})
-        skills = analysis_data.get("top_skills_corporate", [])
-        jobs = analysis_data.get("Suggested roles", [])
-        cv_analysis = analysis_data.get("CV Analysis", [])
-
-        # Format skills
-        skill_texts = [
-            f"{s.get('corporate', s.get('original', 'N/A'))}"
-            for s in skills[:3]
-        ]
-        # Pad with empty strings if less than 3 skills
-        while len(skill_texts) < 3:
-            skill_texts.append("")
-
-        # Format score breakdown
-        score_breakdown = (
-            f"CV Quality: {score.get('cv_quality', 0)}/30, "
-            f"Skills: {score.get('skills_match', 0)}/25, "
-            f"Experience: {score.get('experience', 0)}/25, "
-            f"Personality: {score.get('personality_fit', 0)}/20"
-        )
-
-        # Format job recommendations (top 5 for display)
-        job_summary = "\n".join([
-            f"- {job.get('title', 'N/A')} at {job.get('company', 'N/A')}"
-            for job in jobs[:5]
-        ])
-
-        # Create slug (URL-safe identifier)
-        slug = f"{submission_id}-{datetime.utcnow().strftime('%Y%m%d')}"
-
-        # Prepare request
-        url = f"https://api.webflow.com/v2/collections/{collection_id}/items"
-        headers = {
-            "Authorization": f"Bearer {api_token}",
-            "Content-Type": "application/json",
-            "accept": "application/json"
-        }
-
-        body = {
-            "isArchived": False,
-            "isDraft": False,
-            "fieldData": {
-                "slug": slug,
-                "name": candidate.get("name", "Unknown"),
-                "email": candidate.get("email", ""),
-                "employability-score": str(score.get("total", 0)),
-                #"score-breakdown": score_breakdown,
-                #"top-skill-1": skill_texts[0],
-                #"top-skill-2": skill_texts[1],
-                #"top-skill-3": skill_texts[2],
-                "suggested-roles-2": job_summary,
-                #"cv-analysis": cv_analysis
-                #"submission-timestamp": datetime.utcnow().isoformat() + "Z"
-            }
-        }
-
-        # Make request
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.post(url, json=body, headers=headers)
-            response.raise_for_status()
-
-            result = response.json()
-            webflow_id = result.get("id")
-
-            # Construct results URL (***Need to change to dynamic)
-            results_url = f"www.ukngn.com/form-results/applicant-006"
-
-            print(f"Successfully sent to Webflow CMS: {webflow_id}")
-
-            return {
-                "webflow_item_id": webflow_id,
-                "results_url": results_url
-            }
-
-    except httpx.TimeoutException:
-        print("Webflow API timeout")
-        return None
-    except httpx.HTTPStatusError as e:
-        print(f"Webflow API HTTP error {e.response.status_code}: {e.response.text}")
-        return None
-    except Exception as e:
-        print(f"Error sending to Webflow CMS: {str(e)}")
-        return None
-"""
 
 async def send_to_webflow_cms(
     submission_id: str,
@@ -1177,11 +1067,11 @@ async def send_to_webflow_cms(
             f"{job.get('title', 'Role')} at {job.get('company', 'Company')} ({job.get('location', 'UK')})"
             for job in jobs[:5]
         ]
-        recommendations_text = list_to_text(job_items)
+        recommendations_text = job_items
 
         # Strengths & Improvements
-        strengths_text = list_to_text(cv_analysis.get("strengths", []))
-        improvements_text = list_to_text(cv_analysis.get("improvements", []))
+        strengths_text = cv_analysis.get("strengths", [])
+        improvements_text = cv_analysis.get("improvements", [])
 
         # Analysis Summary
         analysis_text = cv_analysis.get("work_experience", {}).get("summary", "No summary generated.")
