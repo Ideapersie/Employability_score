@@ -48,43 +48,6 @@ app.add_middleware(
 # PYDANTIC MODELS (Data Validation)
 # ============================================================================
 
-class CandidateData(BaseModel):
-    """
-    Model for candidate information from Fillout form
-    Fields are optional since we don't know exact webhook structure yet
-    """
-    submissionId: Optional[str] = Field(None, description="Unique submission ID")
-    formId: Optional[str] = Field(None, description="Fillout form ID")
-    status: Optional[str] = Field(None, description="Submission status")
-
-    # Candidate personal info
-    fullName: Optional[str] = Field(None, alias="Full Name:")
-    email: Optional[str] = Field(None, alias="Email:")
-    phoneNumber: Optional[str] = Field(None, alias="Phone Number:")
-    dateOfBirth: Optional[str] = Field(None, alias="Date of Birth:")
-    linkedIn: Optional[str] = Field(None, alias="Add your LinkedIn")
-
-    # Skills and experience
-    basicSkills: Optional[str] = Field(None, alias="Basic Skills")
-    otherSkills: Optional[str] = Field(None, alias="Other Skills")
-    experienceLevel: Optional[str] = Field(None, alias="Experience Level")
-    softSkills: Optional[str] = Field(None, alias="Soft Skills")
-
-    # Personality traits
-    enjoysWorkingWithPeople: Optional[str] = None
-    prefersClearStructure: Optional[str] = None
-    takesInitiative: Optional[str] = None
-
-    # CV file - could be URL, base64, or file object
-    cvFile: Optional[Any] = Field(None, alias="Please upload your CV to get started")
-
-    # Metadata
-    submissionUrl: Optional[str] = Field(None, alias="Url")
-    lastUpdated: Optional[str] = Field(None, alias="Last updated")
-
-    class Config:
-        populate_by_name = True  # Allow both alias and field name
-
 
 class WebhookPayload(BaseModel):
     """
@@ -127,7 +90,7 @@ class WebflowWebhookPayload(BaseModel):
     
     # 2. Map Personality Scores (People -> workingWithPeople)
     # Accepts string "2" or int 2. Defaults to "3" if missing.
-    workingWithPeople: Union[str, int] = Field("3", alias="People")
+    workingWithPeople: Union[str, int] = Field("3", alias="WorkingWithPeople")
     clearStructure: Union[str, int] = Field("3", alias="StructuredTask")
     takingInitiative: Union[str, int] = Field("3", alias="InitiativeTask")
     
@@ -1337,9 +1300,9 @@ def calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], for
     breakdown["experience"] = experience_mapping.get(experience_level, 10)
 
     # 4. Personality Fit (0-20 points)
-    people_score = form_data.get("People", 3)
-    structured_score = form_data.get("StructuredTask", 3)
-    initiative_score = form_data.get("InitiativeTask", 3)
+    people_score = int(form_data.get("People", 3))
+    structured_score = int(form_data.get("StructuredTask", 3))
+    initiative_score = int(form_data.get("InitiativeTask", 3))
     breakdown["personality_fit"] = int(((people_score + structured_score + initiative_score) / 15) * 20)
 
     total_score = sum(breakdown.values())
@@ -1448,119 +1411,6 @@ async def list_temp_files():
         "files": file_details
     }
 
-# New function for webflow since it requires an addtional key 
-@app.post("/webhook/newflow")
-async def receive_webflow_webhook(request: Request):
-    
-    #Main webhook endpoint to receive Webflow Form submissions
-    
-    start_time = time.time()
-    
-    try:
-        # 1. Get Raw Data (Required for verification)
-        body_bytes = await request.body()
-        headers = dict(request.headers)
-        
-        # 2. SECURITY CHECK: Verify Signature
-        secret = os.environ.get("WEBFLOW_WEBHOOK_SECRET")
-        if secret:
-            is_valid = verify_webflow_signature(body_bytes, headers, secret)
-            if not is_valid:
-                print("Security Alert: Invalid Webflow Signature")
-                raise HTTPException(status_code=401, detail="Invalid Signature")
-        else:
-            print("WARNING: WEBFLOW_WEBHOOK_SECRET not set. Skipping check.")
-
-        # 3. Parse JSON
-        try:
-            full_payload = json.loads(body_bytes)
-        except json.JSONDecodeError:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid JSON"})
-
-        # 4. Extract Core Data (Handle Webflow Structure)
-        # Webflow wraps the real data inside "payload" -> "data"
-        payload_root = full_payload.get("payload", {})
-        form_data = payload_root.get("data", {})
-        
-        # Get IDs
-        submission_id = payload_root.get("id") or full_payload.get("siteId") # Use Webflow's ID
-        
-        # Log the received data
-        log_webhook_data("webflow_submission", form_data, headers)
-
-        # 5. Map Webflow Fields to Your Logic
-        # NOTE: You MUST check your Webflow Form field names! 
-        # They might be "Name" instead of "Full Name". Adjust keys below:
-        mapped_data = {
-            "FullName": form_data.get("FullName","Unknown"),
-            "Email": form_data.get("Email") or form_data.get("email"),
-            "DoB": form_data.get("DoB"),
-            "PhoneNo": form_data.get("PhoneNo") or form_data.get("Phone Number"),
-            # Map skills manually or join all text fields if unsure
-            "BasicSkills": [form_data.get("BasicSkills", "")] if form_data.get("Skills") else [],
-            "OtherSkills": form_data.get("OtherSkills", ""),
-            "ExperienceLvl": form_data.get("ExperienceLvl", "Just starting out"),
-            # Map Score fields (Ensure your Webflow form sends these as numbers)
-            "People": int(form_data.get("People", 3)),
-            "StructuredTask": int(form_data.get("StructuredTask", 3)),
-            "InitiativeTask": int(form_data.get("Initiative Score", 3))
-        }
-
-        # Initialize Response
-        response_data = {
-            "status": "success",
-            "submission_id": submission_id,
-            "candidate": {"name": mapped_data["FullName"], "email": mapped_data["Email"]},
-            "Employability Score": 0,
-            "Suggested roles": [],
-            "CV Analysis": [],
-            "errors": []
-        }
-
-        # 6. CV Processing (Handle Webflow File Uploads)
-        cv_url = None
-        # Webflow sends file uploads as a direct URL string in the data key
-        # Check keys like "CV", "Resume", "File"
-        for key, value in form_data.items():
-            if "cv" in key.lower() or "resume" in key.lower() or "upload" in key.lower():
-                if isinstance(value, str) and value.startswith("http"):
-                    cv_url = value
-                    break
-        
-        cv_analysis = None
-        cv_text = None
-        
-        if cv_url:
-            print(f"Downloading CV from: {cv_url}")
-            pdf_bytes = await download_pdf(cv_url)
-            if pdf_bytes:
-                cv_text = extract_text_from_pdf(pdf_bytes)
-                if cv_text:
-                    # Pass mapped_data instead of raw payload
-                    cv_analysis = await analyze_cv_with_openai(cv_text, mapped_data)
-
-        # 7. Calculate Score & Get Jobs
-        # Pass mapped_data because it has the clean keys your functions expect
-        employability_score = calculate_employability_score(cv_analysis, mapped_data)
-        job_recommendations = await get_job_recommendations(mapped_data, cv_analysis)
-        
-        # 8. Send Results to CMS (Same as before)
-        response_data["Employability Score"] = employability_score
-        response_data["Suggested roles"] = job_recommendations
-        response_data["CV Analysis"] = cv_analysis
-        
-        
-        # ... (Include your Top Skills Translation logic here if needed) ...
-
-        webflow_result = await send_to_webflow_cms(submission_id, response_data)
-        
-        # Final Success Response
-        return JSONResponse(status_code=200, content=response_data)
-
-    except Exception as e:
-        print(f"Error processing Webflow webhook: {str(e)}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
 
 @app.post("/webhook/webflow")
 async def receive_webflow_webhook(request: Request):
@@ -1588,10 +1438,6 @@ async def receive_webflow_webhook(request: Request):
             full_payload = json.loads(body_bytes)
         except json.JSONDecodeError:
             return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid JSON"})
-        
-        print(f"Request body: {request.body}")
-        print(f"Request JSON: {request.json()}")
-        print(f"Content-Type: {request.headers.get('content-type')}")
 
         # 4. Extract Core Data
         payload_root = full_payload.get("payload", {})
