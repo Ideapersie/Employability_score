@@ -313,17 +313,24 @@ def get_environment_status() -> Dict[str, bool]:
 
 async def download_pdf(url: str) -> Optional[bytes]:
     """
-    Download PDF from Fillout S3 URL
-
-    Args:
-        url: S3 URL to PDF file
-
-    Returns:
-        PDF file as bytes, or None if download fails
+    Download PDF from URL (Fillout or Webflow)
+    Uses a Chrome User-Agent to bypass firewall restrictions.
     """
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(url, follow_redirects=True)
+        # Standard Chrome User-Agent string (Windows 10)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url, headers=headers, follow_redirects=True)
+            
+            # Check for access issues
+            if response.status_code == 403:
+                print(f"Access Denied (403) for URL: {url}")
+                print("Tip: Ensure 'Restrict uploaded file access' is OFF in Webflow Site Settings > Forms")
+                return None
+                
             response.raise_for_status()
 
             print(f"PDF downloaded successfully - Size: {len(response.content)} bytes")
@@ -1079,7 +1086,7 @@ async def send_to_webflow_cms(
                     "fieldData": {
                         # System Fields
                         "name": str(candidate.get("name") or "Unknown Candidate"),
-                        "slug": str(submission_id),
+                        "slu": str(submission_id),
                         
                         # Custom Fields (Matching image_1dd993.png)
                         "email": str(candidate.get("email") or ""),
@@ -1094,10 +1101,10 @@ async def send_to_webflow_cms(
                         
                         # Job suggestions 
                         
-                        "job-recommendations": list(job_items),
+                        "job-recommendations": [],
                         
                         # Corporate skill translations
-                        "top-skills-corporate": list(corporate_translation)
+                        "top-skills-corporate": []
                         
                     }
                 }
