@@ -1383,7 +1383,7 @@ async def receive_webflow_webhook(request: Request):
 
             # OPTIONAL CORE FIELDS
             "fullName": str(mapped_data.get("name") or "Unknown Candidate"),
-            "applicationId": str(submission_id),
+            "submission_id": submission_id,
             
             # Analysis Text
             "analysis": [],
