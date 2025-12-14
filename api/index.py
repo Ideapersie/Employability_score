@@ -1113,7 +1113,7 @@ async def send_to_webflow_cms(
             webflow_id = created_items[0].get("id") if created_items else "unknown"
             
             # Results URL
-            results_url = f"www.ukngn.com/application-results/application-result-page"
+            results_url = f"https://ukngn.com/form/api/webhook/results"
             
             print(f"Successfully sent to Webflow CMS: {webflow_id}")
             return {
