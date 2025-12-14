@@ -1341,7 +1341,7 @@ async def receive_webflow_webhook(request: Request):
         if not raw_form_data and "FullName" in full_payload:
             raw_form_data = full_payload
 
-        submission_id = payload_root.get("id") or full_payload.get("siteId") or f"sub-{int(time.time())}"
+        submission_id = payload_root.get("id") or payload_root.get("slug")
         
         log_webhook_data("webflow_submission", raw_form_data, headers)
 
@@ -1362,7 +1362,7 @@ async def receive_webflow_webhook(request: Request):
             "BasicSkills": basic_skills,
             "OtherSkills": webflow_data.otherSkills,
             "ExperienceLvl": webflow_data.experience,
-            "SoftSkills": [], # Log showed "false", safely ignore
+            "SoftSkills": webflow_data.softSkills, 
             
             # Convert scores using the helper
             "People": webflow_data.workingWithPeople,
@@ -1409,7 +1409,7 @@ async def receive_webflow_webhook(request: Request):
             if pdf_bytes:
                 cv_text = extract_text_from_pdf(pdf_bytes)
                 if cv_text:
-                    cv_analysis = await analyze_cv_with_openai(cv_text, mapped_data)
+                    cv_analysis = await analyze_cv_with_openai(cv_text, mapped_data)                
 
         # 8. Calculate Score & Get Jobs
         employability_score = calculate_employability_score(cv_analysis, mapped_data)
@@ -1418,6 +1418,12 @@ async def receive_webflow_webhook(request: Request):
         # 9. Assign Data
         response_data["Employability Score"] = employability_score
         response_data["CV Analysis"] = cv_analysis
+        
+        
+        response_data["areasForImprovement"] = cv_analysis["improvements"]
+        #response_data["recommendations"] = cv_analysis[""]
+        response_data["strengths"] = cv_analysis["strengths"]
+        
         
         # 10. Job recommendation
         response_data["job_recommendations"] = job_recommendations
