@@ -1100,10 +1100,10 @@ async def send_to_webflow_cms(
                         
                         # Job suggestions 
                         
-                        "job_recommendations": [],
+                        #"job_recommendations": [],
                         
                         # Corporate skill translations
-                        "top_skills_corporate": []
+                        #"top_skills_corporate": []
                         
                     }
                 }
@@ -1392,6 +1392,13 @@ async def receive_webflow_webhook(request: Request):
             "recommendations": [],
             "strengths": [],
             "areasForImprovement": [],
+
+            # NEW FIELDS - DIRECT MAPPING
+            # Your get_job_recommendations function output goes here directly
+            "job_recommendations": [],
+            
+            # Your translate_skills_to_corporate function output goes here directly
+            "top_skills_corporate": []
             
         }
 
