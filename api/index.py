@@ -328,7 +328,6 @@ async def download_pdf(url: str) -> Optional[bytes]:
             # Check for access issues
             if response.status_code == 403:
                 print(f"Access Denied (403) for URL: {url}")
-                print("Tip: Ensure 'Restrict uploaded file access' is OFF in Webflow Site Settings > Forms")
                 return None
                 
             response.raise_for_status()
@@ -1426,10 +1425,14 @@ async def receive_webflow_webhook(request: Request):
         response_data["Employability Score"] = employability_score
         response_data["CV Analysis"] = cv_analysis
         
-        
-        response_data["areasForImprovement"] = cv_analysis["improvements"]
-        #response_data["recommendations"] = cv_analysis[""]
-        response_data["strengths"] = cv_analysis["strengths"]
+        # Incase cv analysis fails
+        if cv_analysis:
+            response_data["areasForImprovement"] = cv_analysis.get("improvements", [])
+            response_data["strengths"] = cv_analysis.get("strengths", [])
+            # If you had "recommendations" in cv_analysis, map it here too
+        else:
+            response_data["areasForImprovement"] = []
+            response_data["strengths"] = []
         
         
         # 10. Job recommendation
