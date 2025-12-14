@@ -583,7 +583,7 @@ async def search_adzuna_jobs(
             "sort_by": sort_by
         }
 
-        print(f"Adzuna search: what='{params['what']}', where='{location}'")
+        #print(f"Adzuna search: what='{params['what']}', where='{location}'")
 
         # Make API request
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -733,7 +733,7 @@ async def get_job_recommendations(
         non_london_jobs = []
         for job in deduplicate_jobs(uk_jobs_raw):
             loc_name = job.get('location', {}).get('display_name', '').lower()
-            print(f"Loc Name for Current UK jobs: {loc_name}")
+            #print(f"Loc Name for Current UK jobs: {loc_name}")
             if "london" not in loc_name:  # <--- THIS IS THE FIX
                 non_london_jobs.append(job)
                 
@@ -773,7 +773,7 @@ async def get_job_recommendations(
         non_future_ldn_jobs = []
         for job in deduplicate_jobs(future_jobs_uk):
             loc_name = job.get('location', {}).get('display_name', '').lower()
-            if "london" not in loc_name:  # <--- THIS IS THE FIX
+            if "london" not in loc_name:  
                 non_future_ldn_jobs.append(job)
                 
         future_jobs.extend(deduplicate_jobs(non_future_ldn_jobs)[:1])
@@ -1037,11 +1037,18 @@ async def send_to_webflow_cms(
         # 2. Format Specific Fields
         
         # Job Recommendations
-        job_items = [
-            f"{job.get('title', 'Role')} at {job.get('company', 'Company')} ({job.get('location', 'UK')})"
-            for job in jobs[:5]
-        ]
-        recommendations_text = job_items
+        
+        job_items = []
+        for job in jobs[:5]:
+            job_items.append([
+                job
+                #job.get('title'),
+                #job.get("company"),
+                #job.get("location"),
+                #job.get("description"),
+                #job.get("salary"),
+                #job.get("contract_time"),
+            ])
 
         # Strengths & Improvements
         strengths_text = cv_analysis.get("strengths", [])
@@ -1049,6 +1056,11 @@ async def send_to_webflow_cms(
 
         # Analysis Summary
         analysis_text = cv_analysis.get("work_experience", {}).get("summary", "No summary generated.")
+        
+        
+        # 3. Corporate skills translation
+        corporate_translation = analysis_data.get("top_skills_corporate")
+        
 
         # 3. Construct Payload with Correct Slugs
         url = f"https://api.webflow.com/v2/collections/{collection_id}/items"
@@ -1076,9 +1088,17 @@ async def send_to_webflow_cms(
                         
                         # Note: These use the "-2" suffix from your screenshot
                         "analysis-2": str(analysis_text),
-                        "recommendations-2": str(recommendations_text),
+                        #"recommendations-2": str(recommendations_text),
                         "strengths-2": str(strengths_text),
-                        "areas-for-improvement-2": str(improvements_text)
+                        "areas-for-improvement-2": str(improvements_text),
+                        
+                        # Job suggestions 
+                        
+                        "job-recommendations": list(job_items),
+                        
+                        # Corporate skill translations
+                        "top-skills-corporate": list(corporate_translation)
+                        
                     }
                 }
             ]
@@ -1351,14 +1371,29 @@ async def receive_webflow_webhook(request: Request):
         }
 
         response_data = {
-            "status": "success",
-            "submission_id": submission_id,
-            "candidate": {"name": mapped_data["FullName"], "email": mapped_data["Email"]},
-            "Employability Score": None,
-            "Suggested roles": [],
-            "CV Analysis": None,
-            "top_skills_corporate": [],
-            "errors": []
+            # REQUIRED FIELDS
+            "email": str(mapped_data.get("email") or ""),
+            "score": 0,
+
+            # OPTIONAL CORE FIELDS
+            "fullName": str(mapped_data.get("name") or "Unknown Candidate"),
+            "applicationId": str(submission_id),
+            
+            # Analysis Text
+            "analysis": [],
+            
+            # Arrays
+            "recommendations": [],
+            "strengths": [],
+            "areasForImprovement": [],
+
+            # NEW FIELDS - DIRECT MAPPING
+            # Your get_job_recommendations function output goes here directly
+            "job_recommendations": [],
+            
+            # Your translate_skills_to_corporate function output goes here directly
+            "top_skills_corporate": []
+            
         }
 
         # 7. CV Processing
@@ -1382,10 +1417,12 @@ async def receive_webflow_webhook(request: Request):
         
         # 9. Assign Data
         response_data["Employability Score"] = employability_score
-        response_data["Suggested roles"] = job_recommendations
         response_data["CV Analysis"] = cv_analysis
+        
+        # 10. Job recommendation
+        response_data["job_recommendations"] = job_recommendations
 
-        # 10. Top Skills Translation
+        # 11. Top Skills Translation
         if cv_analysis and cv_text:
             top_skills_raw = extract_top_skills_for_translation(mapped_data, cv_analysis, cv_text)
             if top_skills_raw:
