@@ -95,33 +95,15 @@ class WebflowWebhookPayload(BaseModel):
     takingInitiative: Union[str, int] = Field("3", alias="InitiativeTask")
     
     # 3. Handle CV URL (Log shows it comes as "CV")
-    cv_url: Optional[str] = Field(None, alias="CV")
-    """
-    fullName: str
-    email: str
-    phone: Optional[str] = None
-    linkedin: Optional[str] = None
-    skills: Union[List[str], str] = [] 
-    otherSkills: Optional[str] = ""
-    
-    experience: str = "Just starting out"
-    softSkills: Union[List[str], str] = []
-    workingWithPeople: int = Field(ge=1, le=5)
-    clearStructure: int = Field(ge=1, le=5)
-    takingInitiative: int = Field(ge=1, le=5)
-    # File handling
-    cvFileName: Optional[str] = None
-    cvFileSize: Optional[int] = None
-    cvFileType: Optional[str] = None
+    CV_url: Optional[str] = Field(None, alias="CVUrl")
     
     # Metadata
     submittedAt: Optional[str] = None
     source: Optional[str] = None
-    
 
     class Config:
         extra = "allow"  # Allow additional fields
-    """
+
 
 
 class FilloutWebhookPayload(BaseModel):
@@ -1381,7 +1363,7 @@ async def receive_webflow_webhook(request: Request):
 
         # 7. CV Processing
         # The log shows "CV": "https://webflow.com/files/..."
-        cv_url = webflow_data.cv_url
+        cv_url = webflow_data.CV_url
         
         cv_analysis = None
         cv_text = None
