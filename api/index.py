@@ -1100,10 +1100,10 @@ async def send_to_webflow_cms(
                         
                         # Job suggestions 
                         
-                        "job-recommendations": [],
+                        "job_recommendations": [],
                         
                         # Corporate skill translations
-                        "top-skills-corporate": []
+                        "top_skills_corporate": []
                         
                     }
                 }
