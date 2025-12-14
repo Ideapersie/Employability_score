@@ -1392,13 +1392,6 @@ async def receive_webflow_webhook(request: Request):
             "recommendations": [],
             "strengths": [],
             "areasForImprovement": [],
-
-            # NEW FIELDS - DIRECT MAPPING
-            # Your get_job_recommendations function output goes here directly
-            "job_recommendations": [],
-            
-            # Your translate_skills_to_corporate function output goes here directly
-            "top_skills_corporate": []
             
         }
 
