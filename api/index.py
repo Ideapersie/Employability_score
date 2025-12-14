@@ -1085,7 +1085,7 @@ async def send_to_webflow_cms(
                     "fieldData": {
                         # System Fields
                         "name": str(candidate.get("name") or "Unknown Candidate"),
-                        "slu": str(submission_id),
+                        "slug": str(submission_id),
                         
                         # Custom Fields (Matching image_1dd993.png)
                         "email": str(candidate.get("email") or ""),
