@@ -23,6 +23,7 @@ import time
 import hmac
 import hashlib
 import base64
+import re
 
 # ============================================================================
 # FASTAPI APP INITIALIZATION
@@ -689,18 +690,40 @@ def format_job_for_response(adzuna_job: Dict, job_type: str) -> Dict:
     elif salary_max:
         salary = f"Up to £{salary_max:,.0f}"
     else:
-        salary = "Not specified"
+        salary = "Competitive salary"
+        
+    # Format posted date to user friendly
+    raw_date = adzuna_job.get("created", "")
+    posted_date = "Recently"
+    
+    if raw_date: 
+        try:
+            dt = datetime.strptime(raw_date, "%Y-%m-%dT%H:%M:%SZ")
+            posted_date = dt.strftime("%d %b %Y")
+        except:
+            posted_date = raw_date.split("T")[0]
+            
+    # Clean Description
+    raw_desc = adzuna_job.get("description", "")
+    # Remove HTML tags (if any)
+    clean_desc = re.sub(r'<[^>]+>', '', raw_desc)
+    # Normalize whitespace (remove double spaces/newlines)
+    clean_desc = " ".join(clean_desc.split())
+    
+    # Smart Truncate (400 chars, break at word)
+    if len(clean_desc) > 400:
+        clean_desc = clean_desc[:400].rsplit(' ', 1)[0] + "..."
 
     return {
         "job_type": job_type,
         "title": adzuna_job.get("title", "N/A"),
         "company": adzuna_job.get("company", {}).get("display_name", "N/A"),
         "location": adzuna_job.get("location", {}).get("display_name", "N/A"),
-        "description": adzuna_job.get("description", "")[:500],  # Truncate
+        "description": clean_desc,  # Truncate
         "salary": salary,
-        "contract_time": adzuna_job.get("contract_time", "N/A"),
+        #"contract_time": adzuna_job.get("contract_time", "N/A"),
         "url": adzuna_job.get("redirect_url", ""),
-        "posted_date": adzuna_job.get("created", "N/A"),
+        "posted_date": posted_date,
     }
 
 
