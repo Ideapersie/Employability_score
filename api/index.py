@@ -22,6 +22,7 @@ from openai import OpenAI
 import time
 import hmac
 import hashlib
+import base64
 
 # ============================================================================
 # FASTAPI APP INITIALIZATION
@@ -96,6 +97,8 @@ class WebflowWebhookPayload(BaseModel):
     
     # 3. Handle CV URL (Log shows it comes as "CV")
     CV_url: Optional[str] = Field(None, alias="CVUrl")
+    # New CV for base64 url 
+    CV_file_data: Optional[str] = Field(None, alias="CVFileData")
     
     # Metadata
     submittedAt: Optional[str] = None
@@ -344,6 +347,25 @@ async def download_pdf(url: str) -> Optional[bytes]:
     except Exception as e:
         print(f"Error downloading PDF: {str(e)}")
         return None
+
+def decode_base64_pdf(b64_string: str) -> Optional[bytes]:
+    try: 
+        if not b64_string:
+            return None 
+        
+        if "," in b64_string:
+            b64_string = b64_string.split(",")[1]
+            
+        # Decode into bytes
+        file_bytes = base64.b64decode(b64_string)
+        
+        print(f"Base64 PDF decoded succesfully - Size: {len(file_bytes)} bytes")
+        return file_bytes
+    
+    except Exception as e:
+        print(f"Error decoding Base64 PDF: {str(e)}")
+        return None
+        
 
 
 def extract_text_from_pdf(pdf_bytes: bytes) -> Optional[str]:
@@ -1404,18 +1426,27 @@ async def receive_webflow_webhook(request: Request):
 
         # 7. CV Processing
         # The log shows "CV": "https://webflow.com/files/..."
+        cv_base64 = webflow_data.CV_file_data
         cv_url = webflow_data.CV_url
         
         cv_analysis = None
         cv_text = None
+        pdf_bytes = None 
         
-        if cv_url and cv_url.startswith("http"):
+        # Base64 storage
+        if cv_base64:
+            print("Processing CV from CVFileData (Base64...)")
+            pdf_bytes = decode_base64_pdf(cv_base64)
+        
+        elif cv_url and cv_url.startswith("http"):
             print(f"Downloading CV from: {cv_url}")
             pdf_bytes = await download_pdf(cv_url) 
-            if pdf_bytes:
-                cv_text = extract_text_from_pdf(pdf_bytes)
-                if cv_text:
-                    cv_analysis = await analyze_cv_with_openai(cv_text, mapped_data)                
+        
+        # If pdf, then extract informatino from pdf
+        if pdf_bytes:
+            cv_text = extract_text_from_pdf(pdf_bytes)
+            if cv_text:
+                cv_analysis = await analyze_cv_with_openai(cv_text, mapped_data)                
 
         # 8. Calculate Score & Get Jobs
         employability_score = calculate_employability_score(cv_analysis, mapped_data)
