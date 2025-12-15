@@ -1408,15 +1408,15 @@ async def receive_webflow_webhook(request: Request):
 
         response_data = {
             # REQUIRED FIELDS
-            "email": str(mapped_data.get("email") or ""),
+            "email": str(mapped_data.get("Email") or ""),
             "score": 0,
 
             # OPTIONAL CORE FIELDS
-            "fullName": str(mapped_data.get("name") or "Unknown Candidate"),
+            "fullName": str(mapped_data.get("FullName") or "Unknown Candidate"),
             "submission_id": submission_id,
             
             # Analysis Text
-            "analysis": [],
+            "CV Analysis": [],
             
             # Arrays
             "recommendations": [],
@@ -1463,6 +1463,8 @@ async def receive_webflow_webhook(request: Request):
         # 9. Assign Data
         response_data["Employability Score"] = employability_score
         response_data["CV Analysis"] = cv_analysis
+        response_data["score"] = employability_score["total"]
+        
         
         # Incase cv analysis fails
         if cv_analysis:
