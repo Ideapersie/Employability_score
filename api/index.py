@@ -153,6 +153,14 @@ def log_webhook_data(
         headers: Request headers
         extra_info: Additional information to log
     """
+    # Create a copy to avoid altering the data 
+    safe_payload = data.copy() if isinstance(data, dict) else data
+    
+    if isinstance(safe_payload, dict):
+        if "CVFileData" in safe_payload:
+            safe_payload["CVFileData"] = "[BASE64_DATA_REDACTED_FOR_LOGS]"
+    
+    
     log_entry = {
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "event_type": event_type,
@@ -166,7 +174,7 @@ def log_webhook_data(
             "top_level_keys": list(data.keys()) if isinstance(data, dict) else "not_a_dict",
             "payload_size_bytes": len(str(data)),
         },
-        "payload": data,  # Full payload for analysis
+        "payload": safe_payload,  # Full payload for analysis
     }
     
     
