@@ -1542,7 +1542,7 @@ async def receive_webflow_webhook(request: Request):
         job_recommendations = await get_job_recommendations(mapped_data, cv_analysis)
         
         # 9. Assign Data
-        response_data["Employability Score"] = employability_score
+        response_data["Employability_score"] = employability_score
         response_data["CV Analysis"] = cv_analysis
         response_data["score"] = employability_score["total"]
         
