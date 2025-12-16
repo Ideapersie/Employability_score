@@ -80,24 +80,24 @@ class WebflowWebhookPayload(BaseModel):
     # 1. Map Keys using 'alias'
     fullName: str = Field(..., alias="FullName")
     email: str = Field(..., alias="Email")
-    phone: Optional[str] = Field(None, alias="PhoneNo")
-    linkedin: Optional[str] = Field(None, alias="Linkedin")
+    phone: Optional[str] = Field(None, alias="Phone")
+    linkedin: Optional[str] = Field(None, alias="LinkedIn")
     
     # Skills
-    skills: Union[List[str], str] = Field([], alias="BasicSkills")
+    skills: Union[List[str], str] = Field([], alias="Skills")
     otherSkills: Optional[str] = Field("", alias="OtherSkills")
     
-    experience: str = Field("Just starting out", alias="ExperienceLvl")
+    experience: str = Field("Just starting out", alias="Experience")
     softSkills: Union[List[str], str] = Field([], alias="SoftSkills")
     
     # 2. Map Personality Scores (People -> workingWithPeople)
     # Accepts string "2" or int 2. Defaults to "3" if missing.
     workingWithPeople: Union[str, int] = Field("3", alias="WorkingWithPeople")
-    clearStructure: Union[str, int] = Field("3", alias="StructuredTask")
-    takingInitiative: Union[str, int] = Field("3", alias="InitiativeTask")
+    clearStructure: Union[str, int] = Field("3", alias="ClearStructure")
+    takingInitiative: Union[str, int] = Field("3", alias="TakingInitiative")
     
     # 3. Handle CV URL (Log shows it comes as "CV")
-    CV_url: Optional[str] = Field(None, alias="CVUrl")
+    CV_url: Optional[str] = Field(None, alias="CVFileName")
     # New CV for base64 url 
     CV_file_data: Optional[str] = Field(None, alias="CVFileData")
     
@@ -1431,11 +1431,12 @@ async def receive_webflow_webhook(request: Request):
 
         response_data = {
             # REQUIRED FIELDS
+            "fullName": str(mapped_data.get("FullName") or "Unknown Candidate"),
             "email": str(mapped_data.get("Email") or ""),
             "score": 0,
+            "Employability_score": 0,
 
             # OPTIONAL CORE FIELDS
-            "fullName": str(mapped_data.get("FullName") or "Unknown Candidate"),
             "submission_id": submission_id,
             
             # Analysis Text
