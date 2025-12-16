@@ -448,7 +448,10 @@ Provide:
 5. Career level assessment (graduate/entry/mid/senior)
 6. Key strengths (3-5 points)
 7. Areas for improvement (3-5 points)
-8. CV quality score (0-100) based on completeness, clarity, and professionalism
+8. Provide these specific metrics (0-100):
+    8.1. skills_relevance_score: How well do the skills match the candidate's target job level?
+    8.2. experience_quality_score: Assess the depth/impact of experience, not just years.
+    8.3. cv_analysis: CV strength for given roles, including formatting and professionalism aspects ex. Should be latex with 1-2 pages for technical role.
 9. Suggested job roles (List of 3 specific job titles best suited for profile's skills) - short and simple title allowing for Adzuna API job search (No bracket answer)
 
 
@@ -471,7 +474,11 @@ Return as JSON with this exact structure:
   "career_level": "entry",
   "strengths": ["strength1", "strength2"],
   "improvements": ["improvement1", "improvement2"],
-  "cv_quality_score": number between 0-100,
+  "scoring_metrics":{{
+      "skills_relevance: 0-100,
+      "experience_quality: 0-100,
+      "cv_analysis: 0-100
+      }},
   "suggested_job_roles": ["Role 1", "Role 2", "Role 3] ex. AI Engineer, Python Developer, Graduate Software Engineer
 }}"""
         # Planned changes to model gpt-5-nano
@@ -1265,15 +1272,79 @@ def calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], for
     else:
         grade = "C"
 
-    # Estimate percentile
-    percentile = min(99, int((total_score / 100) * 100))
-
     return {
         "total": total_score,
         "breakdown": breakdown,
-        "grade": grade,
-        "percentile": percentile
     }
+
+
+def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], form_data: Dict[str, Any]) -> Dict[str, Any]:
+    
+    metrics = openai_analysis.get("scoring_metrics", {})
+
+    # 1. CV Quality Score (30%), derived from LLM analysis 
+    cv_score = metrics.get("cv_analysis", 50) * 0.30
+
+    # 2. Skills Match (25%), Hybrid: LLM scoring + form data 
+    skill_llm_score = metrics.get("skills_relevance", 50)
+    
+    # Skills amount from form 
+    skill_count = len(form_data.get("BasicSkills", [])) + len(form_data.get("SoftSkills", [])) + len(form_data.get("OtherSkills", []))
+    
+    # Cap at 10 points 
+    quantity_bonus = min(10, skill_count * 1 )
+    
+    # Formula: 70% llm weighting + 30% form
+    skills_score = (skill_llm_score * 0.7) + (quantity_bonus * 0.3)
+
+    # 3. Experience Level (25%): Time in industry + impact for role (form + LLM)
+    experience_mapping = {
+        "Just starting out": 10,
+        "Some experience": 15,
+        "Experienced": 20,
+        "Very experienced": 25
+    }
+    experience_level = form_data.get("ExperienceLvl", "Just starting out")
+    base_exp = experience_mapping.get(experience_level, 10)
+    # Multiplier depending on impact with given years in industry
+    quality_multiplier = metrics.get("experience_quality", 50) / 100 + 0.5 # Range 0.5 - 1.5 
+    
+    experience_score = min(25, base_exp * quality_multiplier)
+
+    # 4. Personality Fit (20%): Calculate alignment, penalize extreme imbalance in character
+    people_score = int(form_data.get("People", 3))
+    structured_score = int(form_data.get("StructuredTask", 3))
+    initiative_score = int(form_data.get("InitiativeTask", 3))
+    
+    personality_score = ((people_score + structured_score + initiative_score)/15) * 20
+
+    # Calculate grade
+    if total_score >= 90:
+        grade = "A+"
+    elif total_score >= 80:
+        grade = "A"
+    elif total_score >= 70:
+        grade = "B+"
+    elif total_score >= 60:
+        grade = "B"
+    elif total_score >= 50:
+        grade = "C+"
+    else:
+        grade = "C"
+        
+    total_score = cv_score + personality_score + skills_score + experience_score
+
+    return {
+        "total": total_score,
+        "breakdown": {
+            "cv_quality": int(cv_score),
+            "skills_match": int(skills_score),
+            "experience": int(experience_score),
+            "personality_fit": int(personality_score)
+        },
+    }
+
+
 
 # Helper method to analyze the data in print log 
 def save_analysis_to_json(submission_id: str, analysis_data: Dict[str, Any]):
@@ -1481,7 +1552,7 @@ async def receive_webflow_webhook(request: Request):
                 cv_analysis = await analyze_cv_with_openai(cv_text, mapped_data)                
 
         # 8. Calculate Score & Get Jobs
-        employability_score = calculate_employability_score(cv_analysis, mapped_data)
+        employability_score = improved_calculate_employability_score(cv_analysis, mapped_data)
         job_recommendations = await get_job_recommendations(mapped_data, cv_analysis)
         
         # 9. Assign Data
@@ -1661,7 +1732,7 @@ async def receive_fillout_webhook(request: Request):
             response_data["errors"].append("No CV URL found in payload")
 
         # Step 4: Calculate employability score
-        employability_score = calculate_employability_score(cv_analysis, payload)
+        employability_score = improved_calculate_employability_score(cv_analysis, payload)
         response_data["employability_score"] = employability_score
 
         # Phase 3: Job Recommendations via Adzuna
