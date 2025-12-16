@@ -1317,20 +1317,6 @@ def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, A
     initiative_score = int(form_data.get("InitiativeTask", 3))
     
     personality_score = ((people_score + structured_score + initiative_score)/15) * 20
-
-    # Calculate grade
-    if total_score >= 90:
-        grade = "A+"
-    elif total_score >= 80:
-        grade = "A"
-    elif total_score >= 70:
-        grade = "B+"
-    elif total_score >= 60:
-        grade = "B"
-    elif total_score >= 50:
-        grade = "C+"
-    else:
-        grade = "C"
         
     total_score = cv_score + personality_score + skills_score + experience_score
 
