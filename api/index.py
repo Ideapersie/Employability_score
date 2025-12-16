@@ -1286,7 +1286,7 @@ def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, A
     cv_score = metrics.get("cv_analysis", 50) * 0.30
 
     # 2. Skills Match (25%), Hybrid: LLM scoring + form data 
-    skill_llm_score = metrics.get("skills_relevance", 50)
+    skill_llm_score = metrics.get("skills_relevance", 50) * 0.25
     
     # Skills amount from form 
     skill_count = len(form_data.get("BasicSkills", [])) + len(form_data.get("SoftSkills", [])) + len(form_data.get("OtherSkills", []))
@@ -1318,10 +1318,10 @@ def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, A
     
     personality_score = ((people_score + structured_score + initiative_score)/15) * 20
         
-    total_score = cv_score + personality_score + skills_score + experience_score
+    total_score = cv_score + personality_score + skills_score + experience_score 
 
     return {
-        "total": total_score,
+        "total": round(total_score),
         "breakdown": {
             "cv_quality": int(cv_score),
             "skills_match": int(skills_score),
