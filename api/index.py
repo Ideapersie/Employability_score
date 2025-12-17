@@ -110,30 +110,6 @@ class WebflowWebhookPayload(BaseModel):
 
 
 
-class FilloutWebhookPayload(BaseModel):
-    """
-    Model for actual Fillout webhook payload structure
-    Based on real webhook data received
-    """
-    SubmissionID: str
-    BasicSkills: List[str]
-    OtherSkills: str
-    ExperienceLvl: str
-    SoftSkills: List[str]
-    People: int = Field(ge=1, le=5)
-    StructuredTask: int = Field(ge=1, le=5)
-    InitiativeTask: int = Field(ge=1, le=5)
-    FullName: str
-    DoB: str
-    Email: str
-    PhoneNo: str
-    Linkedin: str
-    CV: List[Dict[str, str]]
-
-    class Config:
-        extra = "allow"  # Allow additional fields
-
-
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
