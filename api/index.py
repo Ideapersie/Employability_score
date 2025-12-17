@@ -1174,7 +1174,7 @@ async def send_to_webflow_cms(
         return None
     
 async def post_results_to_webflow(payload: Dict[str,Any]) -> bool:
-    target_url = "https://ukngn.com/form/api/webhook/results"
+    target_url = "https://08dfe29a-d508-48df-ac82-8d96f5519e62.wf-app-prod.cosmic.webflow.services/api/webhook/results"
     
     try:
         print(f"Posting results to webhook: {target_url}")
