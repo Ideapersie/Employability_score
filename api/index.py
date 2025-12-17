@@ -1567,13 +1567,12 @@ async def receive_webflow_webhook(request: Request):
                 response_data["top_skills_corporate"] = top_skills_corporate
 
         # 11. Send to Webflow CMS
-        webflow_result = await send_to_webflow_cms(submission_id, response_data)
+        #webflow_result = await send_to_webflow_cms(submission_id, response_data)
+        await post_results_to_webflow(response_data)
         
         # 5. LOG THE FULL DATA TO CONSOLE
-        save_analysis_to_json(response_data["submission_id"], response_data)
+        save_analysis_to_json(response_data.get("submission_id", "unknown"), response_data)
         
-        if webflow_result:
-            response_data["webflow_results_url"] = webflow_result.get("results_url")
 
         return JSONResponse(status_code=200, content=response_data)
 
