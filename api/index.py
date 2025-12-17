@@ -1172,6 +1172,29 @@ async def send_to_webflow_cms(
     except Exception as e:
         print(f"Error sending to Webflow CMS: {str(e)}")
         return None
+    
+async def post_results_to_webflow(payload: Dict[str,Any]) -> bool:
+    target_url = "https://ukngn.com/form/api/webhook/results"
+    
+    try:
+        print(f"Posting results to webhook: {target_url}")
+        
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(target_url, json=payload) 
+                        
+            # Raise exception for errors                 
+            response.raise_for_status()
+            
+            print(f"Succesfully posted results, Status Code: {response.status_code}")
+            return True
+                 
+    except httpx.HTTPStatusError as e:
+        print(f"Webhook error {e.response.status_code}: {e.response.text}")
+        return False
+    except Exception as e:
+        print(f"Error posting to results webhook: {str(e)}")
+        return False
+
 
 def calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], form_data: Dict[str, Any]) -> Dict[str, Any]:
     """
