@@ -451,9 +451,9 @@ Return as JSON with this exact structure:
   "strengths": ["strength1", "strength2"],
   "improvements": ["improvement1", "improvement2"],
   "scoring_metrics":{{
-      "skills_relevance: 0-100,
-      "experience_quality: 0-100,
-      "cv_analysis: 0-100
+      "skills_relevance": 0-100,
+      "experience_quality": 0-100,
+      "cv_analysis": 0-100
       }},
   "suggested_job_roles": ["Role 1", "Role 2", "Role 3] ex. AI Engineer, Python Developer, Graduate Software Engineer
 }}"""
@@ -1284,8 +1284,8 @@ def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, A
     # 1. CV Quality Score (30%), derived from LLM analysis 
     cv_score = metrics.get("cv_analysis", 50) * 0.30
 
-    # 2. Skills Match (25%), Hybrid: LLM scoring + form data 
-    skill_llm_score = metrics.get("skills_relevance", 50) * 0.25
+    # 2. Skills Match (30%), Hybrid: LLM scoring + form data 
+    skill_llm_score = metrics.get("skills_relevance", 50) * 0.30
     
     # Skills amount from form 
     skill_count = len(form_data.get("BasicSkills", [])) + len(form_data.get("SoftSkills", [])) + len(form_data.get("OtherSkills", []))
@@ -1298,10 +1298,10 @@ def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, A
 
     # 3. Experience Level (25%): Time in industry + impact for role (form + LLM)
     experience_mapping = {
-        "Just starting out": 10,
-        "Some experience": 15,
-        "Experienced": 20,
-        "Very experienced": 25
+        "Just starting out": 12,
+        "Some experience": 14,
+        "Experienced": 16,
+        "Very experienced": 18
     }
     experience_level = form_data.get("ExperienceLvl", "Just starting out")
     base_exp = experience_mapping.get(experience_level, 10)
@@ -1310,12 +1310,12 @@ def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, A
     
     experience_score = min(25, base_exp * quality_multiplier)
 
-    # 4. Personality Fit (20%): Calculate alignment, penalize extreme imbalance in character
+    # 4. Personality Fit (15%): Calculate alignment, penalize extreme imbalance in character
     people_score = int(form_data.get("People", 3))
     structured_score = int(form_data.get("StructuredTask", 3))
     initiative_score = int(form_data.get("InitiativeTask", 3))
     
-    personality_score = ((people_score + structured_score + initiative_score)/15) * 20
+    personality_score = (((people_score + structured_score + initiative_score)/15) * 100) / 15
         
     total_score = cv_score + personality_score + skills_score + experience_score 
 
@@ -1328,7 +1328,6 @@ def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, A
             "personality_fit": int(personality_score)
         },
     }
-
 
 
 # Helper method to analyze the data in print log 
