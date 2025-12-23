@@ -1204,7 +1204,7 @@ def calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], for
     - CV Quality: 30 points (from OpenAI)
     - Skills Match: 25 points (from form + CV)
     - Experience Level: 25 points
-    - Personality Fit: 20 points (People + StructuredTask scores)
+    - Personality Fit: 15 points (People + StructuredTask scores)
 
     Args:
         openai_analysis: Analysis results from OpenAI (or None if failed)
@@ -1315,7 +1315,7 @@ def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, A
     structured_score = int(form_data.get("StructuredTask", 3))
     initiative_score = int(form_data.get("InitiativeTask", 3))
     
-    personality_score = (((people_score + structured_score + initiative_score)/15) * 100) / 15
+    personality_score = (((people_score + structured_score + initiative_score)/15) * 100) * 0.15
         
     total_score = cv_score + personality_score + skills_score + experience_score 
 
