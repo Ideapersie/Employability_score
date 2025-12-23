@@ -385,7 +385,7 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> Optional[str]:
 
 async def analyze_cv_with_openai(cv_text: str, candidate_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
-    Analyze CV content using OpenAI GPT-4o
+    Analyze CV content using OpenAI gpt-5.2
 
     Args:
         cv_text: Extracted text from CV
@@ -459,7 +459,7 @@ Return as JSON with this exact structure:
 }}"""
         # Planned changes to model gpt-5-nano
         response = client.chat.completions.create(
-            model="gpt-5-nano",
+            model="gpt-5.2",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -1001,7 +1001,7 @@ Ensure you return exactly {len(skills_to_translate)} item(s) in the array."""
         # Call OpenAI API
         client = OpenAI(api_key=api_key)
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5.2",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
