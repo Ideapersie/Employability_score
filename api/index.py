@@ -1007,8 +1007,8 @@ Ensure you return exactly {len(skills_to_translate)} item(s) in the array."""
                 {"role": "user", "content": user_prompt}
             ],
             response_format={"type": "json_object"},
-            temperature=0.3,
-            max_tokens=300
+            #temperature=0.3,
+            max_completion_tokens=500
         )
 
         # Parse response
