@@ -927,6 +927,68 @@ def extract_top_skills_for_translation(
 
     return skill_descriptions
 
+def improved_extract_top_skills_for_translation(
+    candidate_data: Dict[str, Any],
+    cv_analysis: Optional[Dict[str, Any]],
+    cv_text: Optional[str]
+) -> List[str]:
+    """
+    Extracts the most 'translatable' skills/experiences from the candidate profile.
+    
+    IMPROVEMENTS:
+    - Prioritizes 'Strengths' from AI analysis (which are often descriptive sentences).
+    - Prioritizes 'Roles' from experience.
+    - Fallback to raw technical/basic skills.
+    """
+    skills_with_scores = []
+
+    # Priority 1: Key Strengths (Highest Quality Context)
+    # These are usually sentences like "Strong leadership shown in university societies"
+    if cv_analysis and "strengths" in cv_analysis:
+        strengths = cv_analysis.get("strengths", [])
+        for strength in strengths[:2]: # Take top 2 strengths
+            skills_with_scores.append({
+                "description": strength,
+                "score": 4, # Highest priority
+                "source": "cv_strength"
+            })
+
+    # Priority 2: Work Experience Roles
+    # "Head Barista" or "Intern" implies a set of responsibilities
+    if cv_analysis and "work_experience" in cv_analysis:
+        work_exp = cv_analysis.get("work_experience", {})
+        roles = work_exp.get("roles", [])
+
+        for role in roles[:1]:  
+            skills_with_scores.append({
+                "description": role,
+                "score": 3,
+                "source": "cv_experience"
+            })
+            
+    # Priority 3: Technical skills (Only if distinct)
+    if cv_analysis and "skills" in cv_analysis:
+        tech_skills = cv_analysis.get("skills", {}).get("technical", [])
+        for skill in tech_skills[:2]:
+            # Avoid simple duplicates
+            if not any(skill.lower() in s["description"].lower() for s in skills_with_scores):
+                skills_with_scores.append({
+                    "description": skill,
+                    "score": 2,
+                    "source": "cv_technical"
+                })
+
+    # Sort by score (highest first) and select top 3
+    skills_with_scores.sort(key=lambda x: x["score"], reverse=True)
+    top_skills = skills_with_scores[:3]
+
+    # Return just the descriptions
+    skill_descriptions = [s["description"] for s in top_skills]
+
+    print(f"Extracted {len(skill_descriptions)} top skills for translation: {skill_descriptions}")
+
+    return skill_descriptions
+
 
 async def translate_skills_to_corporate(skills_to_translate: List[str]) -> List[Dict[str, str]]:
     """
@@ -1050,6 +1112,122 @@ Ensure you return exactly {len(skills_to_translate)} item(s) in the array."""
                 "category": "professional"
             }
             for skill in skills_to_translate
+        ]
+
+
+
+async def improved_translate_skills_to_corporate(skills_to_translate: List[str]) -> List[Dict[str, str]]:
+    """
+    Translate casual/student skills into detailed corporate profiles using OpenAI.
+    
+    Returns structured data:
+    - Corporate Title (6-8 words)
+    - Category
+    - Snippet (1 sentence)
+    - Usefulness (Paragraph)
+    """
+    try:
+        if not skills_to_translate or len(skills_to_translate) == 0:
+            return []
+
+        # Get OpenAI API key
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            print("OpenAI API key not configured for skills translation")
+            return []
+
+        # Prepare the prompt
+        system_prompt = """You are a sophisticated Executive Career Coach. Your job is to translate casual, student, or entry-level experiences into high-value Corporate Competencies.
+
+        For each input skill, you must generate a JSON object with:
+        1. "corporate_title": A professional, resume-ready skill title (6-8 words). Use action verbs.
+        2. "category": Choose one [Leadership, Technical, Professional, Analytical, Creative].
+        3. "snippet": A punchy, one-sentence summary (max 20 words) describing the essence of this skill.
+        4. "usefulness": A professional paragraph (30-50 words) explaining WHY a corporation values this skill. Focus on ROI, efficiency, team dynamics, or risk reduction.
+
+        Examples:
+        Input: "Organised charity events for university"
+        Output: {
+            "corporate_title": "Strategic Event Management & Cross-Functional Stakeholder Coordination",
+            "category": "Professional",
+            "snippet": "Ability to orchestrate complex logistics while managing diverse teams and resources.",
+            "usefulness": "In a corporate environment, this translates to project ownership. Companies value employees who can manage lifecycles independently, reducing management overhead and ensuring that client-facing events or internal initiatives are executed flawlessly."
+        }
+
+        Input: "Good with Python and Data"
+        Output: {
+            "corporate_title": "Data-Driven Problem Solving & Python Automation Architecture",
+            "category": "Technical",
+            "snippet": "Leveraging computational logic to automate workflows and derive actionable insights.",
+            "usefulness": "Automating repetitive tasks directly impacts the bottom line by saving man-hours. Furthermore, the ability to analyze datasets allows for evidence-based decision making, reducing business risk and identifying new opportunities for growth."
+        }
+        """
+
+        # Build numbered list of skills
+        skills_list = "\n".join([f"{i+1}. {skill}" for i, skill in enumerate(skills_to_translate)])
+
+        user_prompt = f"""Transform these {len(skills_to_translate)} skill(s) into detailed corporate competencies:
+
+        {skills_list}
+
+        Return ONLY a JSON array containing {len(skills_to_translate)} objects.
+        """
+
+        print(f"Translating {len(skills_to_translate)} skills to corporate terminology...")
+
+        # Call OpenAI API (Using standard model for reliability)
+        client = OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model="gpt-5.2", # Recommended for this level of nuance
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.4 # Slightly creative but structured
+        )
+
+        # Parse response
+        result = json.loads(response.choices[0].message.content)
+
+        # Handle various return formats (sometimes LLM wraps in a key)
+        translated_skills = []
+        if isinstance(result, list):
+            translated_skills = result
+        elif isinstance(result, dict):
+            # Look for the first list value found in the dict
+            for val in result.values():
+                if isinstance(val, list):
+                    translated_skills = val
+                    break
+        
+        # Validation & Fallback
+        final_skills = []
+        for i, skill in enumerate(translated_skills):
+            # Ensure all keys exist, fallback if missing
+            final_skills.append({
+                "original": skills_to_translate[i] if i < len(skills_to_translate) else "Skill",
+                "corporate_title": skill.get("corporate_title", skill.get("corporate", "Professional Competence")),
+                "category": skill.get("category", "Professional"),
+                "snippet": skill.get("snippet", "A valuable professional skill."),
+                "usefulness": skill.get("usefulness", "This skill contributes to organizational efficiency and goal attainment.")
+            })
+
+        print(f"Successfully translated {len(final_skills)} skills.")
+        return final_skills
+
+    except Exception as e:
+        print(f"Error translating skills: {str(e)}")
+        # Simple Fallback
+        return [
+            {
+                "original": s, 
+                "corporate_title": s, 
+                "category": "Professional",
+                "snippet": "Standard professional capability.",
+                "usefulness": "Contributes to general team productivity."
+            } 
+            for s in skills_to_translate
         ]
 
 
@@ -1562,7 +1740,7 @@ async def receive_webflow_webhook(request: Request):
         if cv_analysis and cv_text:
             top_skills_raw = extract_top_skills_for_translation(mapped_data, cv_analysis, cv_text)
             if top_skills_raw:
-                top_skills_corporate = await translate_skills_to_corporate(top_skills_raw)
+                top_skills_corporate = await improved_translate_skills_to_corporate(top_skills_raw)
                 response_data["top_skills_corporate"] = top_skills_corporate
 
         # 11. Send to Webflow CMS
