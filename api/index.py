@@ -423,11 +423,11 @@ Provide:
 4. Soft skills identified from CV
 5. Career level assessment (graduate/entry/mid/senior)
 6. Key strengths (3-5 points)
-7. Areas for improvement (3-5 points)
+7. Areas for improvement (3-5 points), mainly focusing on what they can improve career-wise and also CV wise
 8. Provide these specific metrics (0-100):
     8.1. skills_relevance_score: How well do the skills match the candidate's target job level?
-    8.2. experience_quality_score: Assess the depth/impact of experience, not just years.
-    8.3. cv_analysis: CV strength for given roles, including formatting and professionalism aspects ex. Should be latex with 1-2 pages for technical role.
+    8.2. experience_quality_score: Assess the depth/impact of experience, not just years. How good is the candidates profile compared to the years in industry, if average then return a score of around 60-70, and higher the better the candidate is.
+    8.3. cv_analysis: CV strength for given roles and professionalism aspects, less importance for the formatting 
 9. Suggested job roles (List of 3 specific job titles best suited for profile's skills) - short and simple title allowing for Adzuna API job search (No bracket answer)
 
 
@@ -1163,87 +1163,6 @@ async def post_results_to_webflow(payload: Dict[str,Any]) -> bool:
     except Exception as e:
         print(f"Error posting to results webhook: {str(e)}")
         return False
-
-
-def calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], form_data: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Calculate employability score (0-100) combining OpenAI analysis and form responses
-
-    Scoring breakdown:
-    - CV Quality: 30 points (from OpenAI)
-    - Skills Match: 25 points (from form + CV)
-    - Experience Level: 25 points
-    - Personality Fit: 15 points (People + StructuredTask scores)
-
-    Args:
-        openai_analysis: Analysis results from OpenAI (or None if failed)
-        form_data: Form submission data
-
-    Returns:
-        Dictionary with total score, breakdown, grade, and percentile
-    """
-    breakdown = {
-        "cv_quality": 0,
-        "skills_match": 0,
-        "experience": 0,
-        "personality_fit": 0
-    }
-
-    # 1. CV Quality Score (0-30 points)
-    if openai_analysis and "cv_quality_score" in openai_analysis:
-        cv_quality = openai_analysis["cv_quality_score"]
-        breakdown["cv_quality"] = int((cv_quality / 100) * 30)
-    else:
-        breakdown["cv_quality"] = 15
-
-    # 2. Skills Match (0-25 points)
-    basic_skills = form_data.get("BasicSkills", [])
-    other_skills = form_data.get("OtherSkills", "")
-    soft_skills = form_data.get("SoftSkills", [])
-
-    skills_count = len(basic_skills) + len(soft_skills)
-    if other_skills and other_skills.strip():
-        skills_count += len(other_skills.split(","))
-
-    # Needs to be  changed *** THiss cant be count-based
-    breakdown["skills_match"] = min(25, skills_count * 3)
-
-    # 3. Experience Level (0-25 points)
-    experience_mapping = {
-        "Just starting out": 6,
-        "Some experience": 12,
-        "Experienced": 18,
-        "Very experienced": 25
-    }
-    experience_level = form_data.get("ExperienceLvl", "Just starting out")
-    breakdown["experience"] = experience_mapping.get(experience_level, 10)
-
-    # 4. Personality Fit (0-20 points)
-    people_score = int(form_data.get("People", 3))
-    structured_score = int(form_data.get("StructuredTask", 3))
-    initiative_score = int(form_data.get("InitiativeTask", 3))
-    breakdown["personality_fit"] = int(((people_score + structured_score + initiative_score) / 15) * 20)
-
-    total_score = sum(breakdown.values())
-
-    # Calculate grade
-    if total_score >= 90:
-        grade = "A+"
-    elif total_score >= 80:
-        grade = "A"
-    elif total_score >= 70:
-        grade = "B+"
-    elif total_score >= 60:
-        grade = "B"
-    elif total_score >= 50:
-        grade = "C+"
-    else:
-        grade = "C"
-
-    return {
-        "total": total_score,
-        "breakdown": breakdown,
-    }
 
 
 def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], form_data: Dict[str, Any]) -> Dict[str, Any]:
