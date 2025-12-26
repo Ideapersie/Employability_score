@@ -1268,14 +1268,14 @@ def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, A
     # 3. Experience Level (25%): Time in industry + impact for role (form + LLM)
     experience_mapping = {
         "Just starting out": 12,
-        "Some experience": 14,
-        "Experienced": 16,
-        "Very experienced": 18
+        "Some experience": 16,
+        "Experienced": 18,
+        "Very experienced": 20
     }
     experience_level = form_data.get("ExperienceLvl", "Just starting out")
     base_exp = experience_mapping.get(experience_level, 10)
     # Multiplier depending on impact with given years in industry
-    quality_multiplier = metrics.get("experience_quality", 50) / 100 + 0.5 # Range 0.5 - 1.5 
+    quality_multiplier = (metrics.get("experience_quality", 50) / 100) + 0.5 # Range 0.5 - 1.5 
     
     experience_score = min(25, base_exp * quality_multiplier)
 
@@ -1465,11 +1465,6 @@ async def receive_webflow_webhook(request: Request):
             
             # Analysis Text
             "CV Analysis": [],
-            
-            # Arrays
-            "recommendations": [],
-            "strengths": [],
-            "areasForImprovement": [],
 
             # NEW FIELDS - DIRECT MAPPING
             # Your get_job_recommendations function output goes here directly
@@ -1512,16 +1507,6 @@ async def receive_webflow_webhook(request: Request):
         response_data["Employability_score"] = employability_score
         response_data["CV Analysis"] = cv_analysis
         response_data["score"] = employability_score["total"]
-        
-        
-        # Incase cv analysis fails
-        if cv_analysis:
-            response_data["areasForImprovement"] = cv_analysis.get("improvements", [])
-            response_data["strengths"] = cv_analysis.get("strengths", [])
-            # If you had "recommendations" in cv_analysis, map it here too
-        else:
-            response_data["areasForImprovement"] = []
-            response_data["strengths"] = []
         
         
         # 10. Job recommendation
