@@ -1192,8 +1192,8 @@ def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, A
         "Very experienced": 20
     }
     experience_level = form_data.get("ExperienceLvl", "Just starting out")
-    print(f"Experience level: {experience_level} and base exp: {base_exp}")
     base_exp = experience_mapping.get(experience_level, 15)
+    print(f"Experience level: {experience_level} and base exp: {base_exp}")
     # Multiplier depending on impact with given years in industry
     quality_multiplier = (metrics.get("experience_quality", 50) / 100) + 0.5 # Range 0.5 - 1.5 
     
