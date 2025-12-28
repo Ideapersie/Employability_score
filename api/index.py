@@ -1182,7 +1182,7 @@ def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, A
     quantity_bonus = min(10, skill_count * 1 )
     
     # Formula: 70% llm weighting + 30% form
-    skills_score = (skill_llm_score * 0.7) + (quantity_bonus * 0.3)
+    skills_score = ((skill_llm_score * 0.7) + (quantity_bonus * 0.3)) * 0.3 
 
     # 3. Experience Level (25%): Time in industry + impact for role (form + LLM)
     experience_mapping = {
