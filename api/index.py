@@ -424,7 +424,7 @@ Provide:
 5. Career level assessment (graduate/entry/mid/senior)
 6. Key strengths (3-5 points)
 7. Areas for improvement (3-5 points), mainly focusing on what they can improve career-wise such as what aspects to work on, ex. if technical they may be missing foundation in cloud or if non-technical, they may be lacking in numbers/business credentials
-8. Provide these specific metrics (0-100):
+8. Provide these specific metrics (0-100): set the average score to be around 70 so that the candidates who are good can achieve higher than 80, overall score
     8.1. skills_relevance_score: How well do the skills match the candidate's target job level?
     8.2. experience_quality_score: Assess the depth/impact of experience, not just years. How good is the candidates profile compared to the years in industry, if average then return a score of around 60-70, and higher the better the candidate is.
     8.3. cv_analysis: CV strength for given roles and professionalism aspects, less importance for the formatting 
@@ -1173,7 +1173,7 @@ def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, A
     cv_score = metrics.get("cv_analysis", 50) * 0.30
 
     # 2. Skills Match (30%), Hybrid: LLM scoring + form data 
-    skill_llm_score = metrics.get("skills_relevance", 50) * 0.30
+    skill_llm_score = metrics.get("skills_relevance", 50)
     
     # Skills amount from form 
     skill_count = len(form_data.get("BasicSkills", [])) + len(form_data.get("SoftSkills", [])) + len(form_data.get("OtherSkills", []))
