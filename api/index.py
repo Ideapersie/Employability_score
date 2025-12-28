@@ -1178,15 +1178,15 @@ def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, A
     # Skills amount from form 
     skill_count = len(form_data.get("BasicSkills", [])) + len(form_data.get("SoftSkills", [])) + len(form_data.get("OtherSkills", []))
     
-    # Cap at 10 points 
-    quantity_bonus = min(10, skill_count * 1 )
+    # Cap at 10 points, multiply by 10 to normalize it accordingly 
+    quantity_bonus = min(10, skill_count * 1 ) * 10 
     
     # Formula: 70% llm weighting + 30% form
     skills_score = ((skill_llm_score * 0.7) + (quantity_bonus * 0.3)) * 0.3 
 
     # 3. Experience Level (25%): Time in industry + impact for role (form + LLM)
     experience_mapping = {
-        "Just starting out": 12,
+        "Just starting out": 14,
         "Some experience": 16,
         "Experienced": 18,
         "Very experienced": 20
