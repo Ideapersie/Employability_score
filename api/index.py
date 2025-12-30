@@ -98,9 +98,11 @@ class WebflowWebhookPayload(BaseModel):
     takingInitiative: Union[str, int] = Field("3", alias="TakingInitiative")
     
     # 3. Handle CV URL (Log shows it comes as "CV")
-    CV_url: Optional[str] = Field(None, alias="CVFileName")
-    # New CV for base64 url 
-    CV_file_data: Optional[str] = Field(None, alias="CVFileData")
+    cv_fileName: Optional[str] = Field(None, alias="CVFileName")
+    cv_fileSize: Optional[str] = Field(None, alias="CVFileSize")
+    cv_file_type: Optional[str] = Field(None, alias="CVFileType")
+    CV_url: Optional[str] = Field(None, alias="CVFileURL")
+    CV_url_type: Optional[str] = Field(None, alias="CVUrlType")
     
     # Metadata
     submittedAt: Optional[str] = None
@@ -1545,6 +1547,7 @@ async def receive_webflow_webhook(request: Request):
         pdf_bytes = None 
         
         # Base64 storage
+        """
         if cv_base64:
             print("Processing CV from CVFileData (Base64...)")
             pdf_bytes = decode_base64_pdf(cv_base64)
@@ -1552,6 +1555,7 @@ async def receive_webflow_webhook(request: Request):
         elif cv_url and cv_url.startswith("http"):
             print(f"Downloading CV from: {cv_url}")
             pdf_bytes = await download_pdf(cv_url) 
+        """
         
         # If pdf, then extract informatino from pdf
         if pdf_bytes:
