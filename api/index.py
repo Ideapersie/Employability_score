@@ -355,13 +355,33 @@ def decode_base64_pdf(b64_string: str) -> Optional[bytes]:
 # New helper method to convert pdf directly to image for cv analysis
 def convert_pdf_images(pdf_bytes: bytes) -> List[str]:
     """
-    Converts PDF pages to JPEG images to be used for CV analysis with a vision LLM model
+    Converts PDF pages to PNG images to be used for CV analysis with a vision LLM model
     """
-try: 
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    try: 
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        base64_image = []
+        
+        # Processing each page of pdf 
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            # Improves OCR accuracy
+            pix = page.get_pixmap(matrix=fitz.Matrix(2,2))
+            
+            # Convert to bytes 
+            img_data = pix.tobytes("png")
+            
+            #Encode it to base64 
+            b64_str = base64.b64encode(img_data).decode("utf-8")
+            base64_image.append(b64_str)
+            
+        print(f"Converted {len(base64_image)}pages to PNG for vision analysis")
+        return base64_image
+        
+    except Exception as e:
+        print(f"Error processing the PDF : {str(e)}")
+        return []
     
-except:
-    print(False)
+        
 
 def extract_text_from_pdf(pdf_bytes: bytes) -> Optional[str]:
     """
