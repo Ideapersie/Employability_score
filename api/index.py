@@ -411,9 +411,118 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> Optional[str]:
     except Exception as e:
         print(f"Error extracting text from PDF: {str(e)}")
         return None
+    
+async def analyze_cv_with_openai(pdf_bytes: bytes, candidate_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Analyze CV using gpt-4o vision
+    """
+    
+    try: 
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            return None
+        
+        # Convert PDF to images 
+        cv_images = convert_pdf_images(pdf_bytes)
+        if not cv_images: 
+            print("Failures to convert PDF to images")
+            return None
+        
+        client = OpenAI(api_key=api_key)
+
+        # 2. Prepare the System Prompt (remains mostly the same)
+        system_prompt = "You are an expert career counselor. Analyze the CV images provided to assess employability."
+
+        # 3. Prepare the User Content (Text + Images)
+        # We start with the text instructions
+        user_content = [
+            {
+                "type": "text", 
+                "text": f"""Analyze these CV images and provide structured feedback.
+                
+Candidate Information:
+- Name: {candidate_data.get('FullName', 'N/A')}
+- Experience Level: {candidate_data.get('ExperienceLvl', 'N/A')}
+- Basic Skills: {', '.join(candidate_data.get('BasicSkills', []))}
+- Other Skills: {candidate_data.get('OtherSkills', 'N/A')}
+- Soft Skills: {', '.join(candidate_data.get('SoftSkills', []))}
+
+Provide:
+1. Work experience summary (summary text, years of experience, roles)
+2. Education summary (highest level, field, institutions)
+3. Technical skills identified from CV
+4. Soft skills identified from CV
+5. Career level assessment (graduate/entry/mid/senior)
+6. Key strengths (3-5 points)
+7. Areas for improvement (3-5 points), mainly focusing on what they can improve career-wise such as what aspects to work on, ex. if technical they may be missing foundation in cloud or if non-technical, they may be lacking in numbers/business credentials
+8. Provide these specific metrics (0-100): 
+    8.1. skills_relevance_score: How well do the skills match the candidate's target job level? Allows both high score for technical and non-technical candidates as long as they are highly skilled in the field
+    8.2. experience_quality_score: Assess the depth/impact of experience, not just years. How good is the candidates profile compared to the years in industry, if average then return a score of around 70, and higher the better the candidate is.
+    8.3. cv_analysis: CV strength for given roles and professionalism aspects, less importance for the formatting 
+9. Suggested job roles (List of 3 specific job titles best suited for profile's skills) - short and simple title allowing for Adzuna API job search (No bracket answer)
+
+Return as JSON with this exact structure:
+{{
+  "work_experience": {{
+    "summary": "brief summary",
+    "years": 0,
+    "roles": ["role1", "role2"]
+  }},
+  "education": {{
+    "highest_level": "degree level",
+    "field": "field of study",
+    "institutions": ["institution1"]
+  }},
+  "skills": {{
+    "technical": ["skill1", "skill2"],
+    "soft": ["skill1", "skill2"]
+  }},
+  "career_level": "entry",
+  "strengths": ["strength1", "strength2"],
+  "improvements": ["improvement1", "improvement2"],
+  "scoring_metrics":{{
+      "skills_relevance": 0-100,
+      "experience_quality": 0-100,
+      "cv_analysis": 0-100
+      }},
+  "suggested_job_roles": ["Role 1", "Role 2", "Role 3] ex. AI Engineer, Python Developer, Graduate Software Engineer
+            }}  """
+               
+            }
+        ]
+
+        # Append each image to the content list
+        for b64_img in cv_images:
+            user_content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/png;base64,{b64_img}",
+                    "detail": "high" # 'high' mode allows reading small text
+                }
+            })
+
+        # 4. Call OpenAI (Use gpt-4o)
+        print("Sending images to GPT-4o Vision...")
+        response = client.chat.completions.create(
+            model="gpt-4o", # Standard gpt-4o has vision capabilities built-in
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=2000
+        )
+
+        analysis = json.loads(response.choices[0].message.content)
+        print("GPT-4o Vision analysis completed successfully")
+        return analysis
+
+    except Exception as e:
+        print(f"Error in Vision Analysis: {str(e)}")
+        return None
 
 
-async def analyze_cv_with_openai(cv_text: str, candidate_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+async def analyze_cv_with(cv_text: str, candidate_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Analyze CV content using OpenAI gpt-5.2
 
@@ -1446,9 +1555,7 @@ async def receive_webflow_webhook(request: Request):
         
         # If pdf, then extract informatino from pdf
         if pdf_bytes:
-            cv_text = extract_text_from_pdf(pdf_bytes)
-            if cv_text:
-                cv_analysis = await analyze_cv_with_openai(cv_text, mapped_data)                
+            cv_analysis = await analyze_cv_with_openai(pdf_bytes, mapped_data)                
 
         # 8. Calculate Score & Get Jobs
         employability_score = improved_calculate_employability_score(cv_analysis, mapped_data)
