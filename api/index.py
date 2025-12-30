@@ -24,6 +24,7 @@ import hmac
 import hashlib
 import base64
 import re
+import fitz 
 
 # ============================================================================
 # FASTAPI APP INITIALIZATION
@@ -351,7 +352,16 @@ def decode_base64_pdf(b64_string: str) -> Optional[bytes]:
         print(f"Error decoding Base64 PDF: {str(e)}")
         return None
         
-
+# New helper method to convert pdf directly to image for cv analysis
+def convert_pdf_images(pdf_bytes: bytes) -> List[str]:
+    """
+    Converts PDF pages to JPEG images to be used for CV analysis with a vision LLM model
+    """
+try: 
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    
+except:
+    print(False)
 
 def extract_text_from_pdf(pdf_bytes: bytes) -> Optional[str]:
     """
