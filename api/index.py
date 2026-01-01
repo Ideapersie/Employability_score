@@ -506,13 +506,12 @@ async def analyze_cv_with_openai(pdf_bytes: bytes, candidate_data: Dict[str, Any
         # 4. Call OpenAI (Use gpt-4o)
         print("Sending images to GPT-4o Vision...")
         response = client.chat.completions.create(
-            model="gpt-4o", # Standard gpt-4o has vision capabilities built-in
+            model="gpt-5.2", # Standard gpt-4o has vision capabilities built-in
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}
             ],
-            response_format={"type": "json_object"},
-            max_tokens=2000
+            response_format={"type": "json_object"}
         )
 
         analysis = json.loads(response.choices[0].message.content)
