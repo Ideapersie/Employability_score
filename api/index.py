@@ -985,8 +985,7 @@ async def get_job_recommendations(
 
 def extract_top_skills_for_translation(
     candidate_data: Dict[str, Any],
-    cv_analysis: Optional[Dict[str, Any]],
-    cv_text: Optional[str]
+    cv_analysis: Optional[Dict[str, Any]]
 ) -> List[str]:
     """
     Extracts the most 'translatable' skills/experiences from the candidate profile.
@@ -1059,6 +1058,7 @@ async def translate_skills_to_corporate(skills_to_translate: List[str]) -> List[
     """
     try:
         if not skills_to_translate or len(skills_to_translate) == 0:
+            print("No retrieved skills")
             return []
 
         # Get OpenAI API key
@@ -1585,7 +1585,7 @@ async def receive_webflow_webhook(request: Request):
 
         # 11. Top Skills Translation
         if cv_analysis:
-            top_skills_raw = extract_top_skills_for_translation(mapped_data, cv_analysis, cv_text)
+            top_skills_raw = extract_top_skills_for_translation(mapped_data, cv_analysis)
             if top_skills_raw:
                 top_skills_corporate = await translate_skills_to_corporate(top_skills_raw)
                 response_data["top_skills_corporate"] = top_skills_corporate
