@@ -101,7 +101,7 @@ class WebflowWebhookPayload(BaseModel):
     cv_fileName: Optional[str] = Field(None, alias="CVFileName")
     cv_fileSize: Optional[str] = Field(None, alias="CVFileSize")
     cv_file_type: Optional[str] = Field(None, alias="CVFileType")
-    CV_url: Optional[str] = Field(None, alias="CVFileURL")
+    CV_url: Optional[str] = Field(None, alias="CVFileUrl")
     CV_url_type: Optional[str] = Field(None, alias="CVUrlType")
     
     # Metadata
