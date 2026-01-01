@@ -105,8 +105,8 @@ class WebflowWebhookPayload(BaseModel):
     CV_url_type: Optional[str] = Field(None, alias="CVUrlType")
     
     # Metadata
-    submittedAt: Optional[str] = None
-    source: Optional[str] = None
+    submittedAt: Optional[str] = Field(None, alias="SubmittedAt")
+    source: Optional[str] = Field(None, alias="Source")
 
     class Config:
         extra = "allow"  # Allow additional fields
