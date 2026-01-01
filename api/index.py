@@ -1559,7 +1559,6 @@ async def receive_webflow_webhook(request: Request):
         pdf_bytes = None 
         
         # Base64 storage
-        """
         if cv_base64:
             print("Processing CV from CVFileData (Base64...)")
             pdf_bytes = decode_base64_pdf(cv_base64)
@@ -1567,7 +1566,6 @@ async def receive_webflow_webhook(request: Request):
         elif cv_url and cv_url.startswith("http"):
             print(f"Downloading CV from: {cv_url}")
             pdf_bytes = await download_pdf(cv_url) 
-        """
         
         # If pdf, then extract informatino from pdf
         if pdf_bytes:
