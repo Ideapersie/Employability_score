@@ -1584,7 +1584,7 @@ async def receive_webflow_webhook(request: Request):
         response_data["job_recommendations"] = job_recommendations
 
         # 11. Top Skills Translation
-        if cv_analysis and cv_text:
+        if cv_analysis:
             top_skills_raw = extract_top_skills_for_translation(mapped_data, cv_analysis, cv_text)
             if top_skills_raw:
                 top_skills_corporate = await translate_skills_to_corporate(top_skills_raw)
