@@ -442,52 +442,52 @@ async def analyze_cv_with_openai(pdf_bytes: bytes, candidate_data: Dict[str, Any
                 "type": "text", 
                 "text": f"""Analyze these CV images and provide structured feedback.
                 
-Candidate Information:
-- Name: {candidate_data.get('FullName', 'N/A')}
-- Experience Level: {candidate_data.get('ExperienceLvl', 'N/A')}
-- Basic Skills: {', '.join(candidate_data.get('BasicSkills', []))}
-- Other Skills: {candidate_data.get('OtherSkills', 'N/A')}
-- Soft Skills: {', '.join(candidate_data.get('SoftSkills', []))}
+    Candidate Information:
+    - Name: {candidate_data.get('FullName', 'N/A')}
+    - Experience Level: {candidate_data.get('ExperienceLvl', 'N/A')}
+    - Basic Skills: {', '.join(candidate_data.get('BasicSkills', []))}
+    - Other Skills: {candidate_data.get('OtherSkills', 'N/A')}
+    - Soft Skills: {', '.join(candidate_data.get('SoftSkills', []))}
 
-Provide:
-1. Work experience summary (summary text, years of experience, roles)
-2. Education summary (highest level, field, institutions)
-3. Technical skills identified from CV
-4. Soft skills identified from CV
-5. Career level assessment (graduate/entry/mid/senior)
-6. Key strengths (3-5 points)
-7. Areas for improvement (3-5 points), mainly focusing on what they can improve career-wise such as what aspects to work on, ex. if technical they may be missing foundation in cloud or if non-technical, they may be lacking in numbers/business credentials
-8. Provide these specific metrics (0-100): 
-    8.1. skills_relevance_score: How well do the skills match the candidate's target job level? Allows both high score for technical and non-technical candidates as long as they are highly skilled in the field
-    8.2. experience_quality_score: Assess the depth/impact of experience, not just years. How good is the candidates profile compared to the years in industry, if average then return a score of around 70, and higher the better the candidate is.
-    8.3. cv_analysis: CV strength for given roles and professionalism aspects, less importance for the formatting 
-9. Suggested job roles (List of 3 specific job titles best suited for profile's skills) - short and simple title allowing for Adzuna API job search (No bracket answer)
+    Provide:
+    1. Work experience summary (summary text, years of experience, roles)
+    2. Education summary (highest level, field, institutions)
+    3. Technical skills identified from CV
+    4. Soft skills identified from CV
+    5. Career level assessment (graduate/entry/mid/senior)
+    6. Key strengths (3-5 points)
+    7. Areas for improvement (3-5 points), mainly focusing on what they can improve career-wise such as what aspects to work on, ex. if technical they may be missing foundation in cloud or if non-technical, they may be lacking in numbers/business credentials
+    8. Provide these specific metrics (0-100): 
+        8.1. skills_relevance_score: How well do the skills match the candidate's target job level? Allows both high score for technical and non-technical candidates as long as they are highly skilled in the field
+        8.2. experience_quality_score: Assess the depth/impact of experience, not just years. How good is the candidates profile compared to the years in industry, if average then return a score of around 70, and higher the better the candidate is.
+        8.3. cv_analysis: CV strength for given roles and professionalism aspects, less importance for the formatting 
+    9. Suggested job roles (List of 3 specific job titles best suited for profile's skills) - short and simple title allowing for Adzuna API job search (No bracket answer)
 
-Return as JSON with this exact structure:
-{{
-  "work_experience": {{
-    "summary": "brief summary",
-    "years": 0,
-    "roles": ["role1", "role2"]
-  }},
-  "education": {{
-    "highest_level": "degree level",
-    "field": "field of study",
-    "institutions": ["institution1"]
-  }},
-  "skills": {{
-    "technical": ["skill1", "skill2"],
-    "soft": ["skill1", "skill2"]
-  }},
-  "career_level": "entry",
-  "strengths": ["strength1", "strength2"],
-  "improvements": ["improvement1", "improvement2"],
-  "scoring_metrics":{{
-      "skills_relevance": 0-100,
-      "experience_quality": 0-100,
-      "cv_analysis": 0-100
-      }},
-  "suggested_job_roles": ["Role 1", "Role 2", "Role 3] ex. AI Engineer, Python Developer, Graduate Software Engineer
+    Return as JSON with this exact structure:
+    {{
+    "work_experience": {{
+        "summary": "brief summary",
+        "years": 0,
+        "roles": ["role1", "role2"]
+    }},
+    "education": {{
+        "highest_level": "degree level",
+        "field": "field of study",
+        "institutions": ["institution1"]
+    }},
+    "skills": {{
+        "technical": ["skill1", "skill2"],
+        "soft": ["skill1", "skill2"]
+    }},
+    "career_level": "entry",
+    "strengths": ["strength1", "strength2"],
+    "improvements": ["improvement1", "improvement2"],
+    "scoring_metrics":{{
+        "skills_relevance": 0-100,
+        "experience_quality": 0-100,
+        "cv_analysis": 0-100
+        }},
+    "suggested_job_roles": ["Role 1", "Role 2", "Role 3] ex. AI Engineer, Python Developer, Graduate Software Engineer
             }}  """
                
             }
@@ -1307,6 +1307,18 @@ async def post_results_to_webflow(payload: Dict[str,Any]) -> bool:
 
 
 def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, Any]], form_data: Dict[str, Any]) -> Dict[str, Any]:
+    
+    # SAFETY CHECK: Handle missing analysis (e.g., no CV uploaded)
+    if not openai_analysis:
+        return {
+            "total": 0,
+            "breakdown": {
+                "cv_quality": 0,
+                "skills_match": 0,
+                "experience": 0,
+                "personality_fit": 0
+            },
+        }
     
     metrics = openai_analysis.get("scoring_metrics", {})
 
