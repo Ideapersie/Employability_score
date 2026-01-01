@@ -1354,11 +1354,11 @@ def improved_calculate_employability_score(openai_analysis: Optional[Dict[str, A
     experience_score = min(25, base_exp * quality_multiplier)
 
     # 4. Personality Fit (15%): Calculate alignment, penalize extreme imbalance in character
-    people_score = int(form_data.get("People", 3))
-    structured_score = int(form_data.get("StructuredTask", 3))
-    initiative_score = int(form_data.get("InitiativeTask", 3))
+    people_score = int(form_data.get("People", 50))
+    structured_score = int(form_data.get("StructuredTask", 50))
+    initiative_score = int(form_data.get("InitiativeTask", 50))
     
-    personality_score = (((people_score + structured_score + initiative_score)/15) * 100) * 0.15
+    personality_score = ((people_score + structured_score + initiative_score)/3) * 0.15
         
     total_score = cv_score + personality_score + skills_score + experience_score 
 
