@@ -479,7 +479,6 @@ async def analyze_cv_with_openai(pdf_bytes: bytes, candidate_data: Dict[str, Any
         "technical": ["skill1", "skill2"],
         "soft": ["skill1", "skill2"]
     }},
-    "career_level": "entry",
     "strengths": ["strength1", "strength2"],
     "improvements": ["improvement1", "improvement2"],
     "scoring_metrics":{{
@@ -905,7 +904,7 @@ async def get_job_recommendations(
                 jobs = await search_adzuna_jobs(
                     keywords=[keyword],
                     location=city,
-                    results_per_page=5,
+                    results_per_page=2,
                     sort_by="relevance"
                 )
                 if jobs:
