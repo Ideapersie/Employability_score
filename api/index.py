@@ -767,7 +767,7 @@ async def search_adzuna_jobs(
         return None
     
     
-async def search_job_reed(
+async def search_reed_jobs(
     keywords: List[str],
     location: str ="london",
     results_to_take: int = 5,
@@ -833,8 +833,13 @@ def deduplicate_jobs(jobs: List[Dict]) -> List[Dict]:
     unique_jobs = []
 
     for job in jobs:
-        company = job.get("company", {}).get("display_name", "Unknown").lower().strip()
-        title = job.get("title", "").lower().strip()
+        # Schema names for Adzuna
+        #company = job.get("company", {}).get("display_name", "Unknown").lower().strip()
+        #title = job.get("title", "").lower().strip()
+        
+        # details for Reed
+        company = job.get("employerName", "Unknown").lower().strip()
+        title = job.get("jobTitle", "").lower().strip()
 
         # Makes sure its not the same company
         if company not in seen_companies and title and company:
@@ -844,7 +849,7 @@ def deduplicate_jobs(jobs: List[Dict]) -> List[Dict]:
     return unique_jobs
 
 
-def format_job_for_response(adzuna_job: Dict, job_type: str) -> Dict:
+def format_job_for_response(reed_job: Dict, job_type: str) -> Dict:
     """
     Extract and format relevant fields from Adzuna job
 
@@ -856,8 +861,8 @@ def format_job_for_response(adzuna_job: Dict, job_type: str) -> Dict:
         Formatted job dictionary
     """
     # Format salary
-    salary_min = adzuna_job.get("salary_min")
-    salary_max = adzuna_job.get("salary_max")
+    salary_min = reed_job.get("salary_min")
+    salary_max = reed_job.get("salary_max")
 
     if salary_min and salary_max and (salary_min != salary_max):
         salary = f"£{salary_min:,.0f} - £{salary_max:,.0f}"
@@ -869,7 +874,7 @@ def format_job_for_response(adzuna_job: Dict, job_type: str) -> Dict:
         salary = "Competitive salary"
         
     # Format posted date to user friendly
-    raw_date = adzuna_job.get("created", "")
+    raw_date = reed_job.get("date", "")
     posted_date = "Recently"
     
     if raw_date: 
@@ -877,10 +882,10 @@ def format_job_for_response(adzuna_job: Dict, job_type: str) -> Dict:
             dt = datetime.strptime(raw_date, "%Y-%m-%dT%H:%M:%SZ")
             posted_date = dt.strftime("%d %b %Y")
         except:
-            posted_date = raw_date.split("T")[0]
+            posted_date = raw_date
             
     # Clean Description
-    raw_desc = adzuna_job.get("description", "")
+    raw_desc = reed_job.get("jobDescription", "")
     # Remove HTML tags (if any)
     clean_desc = re.sub(r'<[^>]+>', '', raw_desc)
     # Normalize whitespace (remove double spaces/newlines)
@@ -892,13 +897,13 @@ def format_job_for_response(adzuna_job: Dict, job_type: str) -> Dict:
 
     return {
         "job_type": job_type,
-        "title": adzuna_job.get("title", "N/A"),
-        "company": adzuna_job.get("company", {}).get("display_name", "N/A"),
-        "location": adzuna_job.get("location", {}).get("display_name", "N/A"),
+        "title": reed_job.get("title", "N/A"),
+        "company": reed_job.get("company", {}).get("display_name", "N/A"),
+        "location": reed_job.get("location", {}).get("display_name", "N/A"),
         "description": clean_desc,  # Truncate
         "salary": salary,
         #"contract_time": adzuna_job.get("contract_time", "N/A"),
-        "url": adzuna_job.get("redirect_url", ""),
+        "url": reed_job.get("jobUrl", ""),
         "posted_date": posted_date,
     }
 
@@ -940,7 +945,7 @@ async def get_job_recommendations(
 
         # Make 4 searches for current London
         for keyword in current_keywords[:5]:
-            jobs = await search_adzuna_jobs(
+            jobs = await search_reed_jobs(
                 keywords=[keyword],
                 location="london",
                 results_per_page=5,
@@ -955,7 +960,7 @@ async def get_job_recommendations(
         # Making 4 Searches for current UK 
         for keyword in current_keywords[:5]:
             for city in target_cities: 
-                jobs = await search_adzuna_jobs(
+                jobs = await search_reed_jobs(
                     keywords=[keyword],
                     location=city,
                     results_per_page=2,
@@ -967,7 +972,7 @@ async def get_job_recommendations(
         # Filter: Remove any job where location contains "London"
         non_london_jobs = []
         for job in deduplicate_jobs(uk_jobs_raw):
-            loc_name = job.get('location', {}).get('display_name', '').lower()
+            loc_name = job.get('locationName', '').lower()
             #print(f"Loc Name for Current UK jobs: {loc_name}")
             if "london" not in loc_name:  # <--- THIS IS THE FIX
                 non_london_jobs.append(job)
@@ -981,7 +986,7 @@ async def get_job_recommendations(
 
         # London based
         for keyword in future_keywords[:1]:
-            jobs = await search_adzuna_jobs(
+            jobs = await search_reed_jobs(
                 keywords=[keyword],
                 location="london",
                 results_per_page=5,
@@ -995,7 +1000,7 @@ async def get_job_recommendations(
         # Uk based        
         for keyword in future_keywords[:1]:
             for city in target_cities: 
-                jobs = await search_adzuna_jobs(
+                jobs = await search_reed_jobs(
                     keywords=[keyword],
                     location=city,
                     results_per_page=2,
@@ -1007,7 +1012,7 @@ async def get_job_recommendations(
         # Filter: Remove any job where location contains "London"
         non_future_ldn_jobs = []
         for job in deduplicate_jobs(future_jobs_uk):
-            loc_name = job.get('location', {}).get('display_name', '').lower()
+            loc_name = job.get('locationName', '').lower()
             if "london" not in loc_name:  
                 non_future_ldn_jobs.append(job)
                 
@@ -1023,14 +1028,12 @@ async def get_job_recommendations(
             formatted_jobs.append(format_job_for_response(job, "future"))
 
         print(f"Job recommendations prepared: {len(current_jobs)} current, {len(future_jobs)} future")
-        print(f"Keywords for current:{current_keywords[:5]}, Future keywords:{future_keywords[:2]}")
 
         return formatted_jobs
 
     except Exception as e:
         print(f"Error getting job recommendations: {str(e)}")
         return []
-
 
 # ============================================================================
 # TOP SKILLS CORPORATE TRANSLATION FUNCTIONS (Phase 4)
