@@ -299,6 +299,7 @@ def get_environment_status() -> Dict[str, bool]:
         "ADZUNA_APP_KEY": bool(os.environ.get("ADZUNA_APP_KEY")),
         "WEBFLOW_API_TOKEN": bool(os.environ.get("WEBFLOW_API_TOKEN")),
         "WEBFLOW_COLLECTION_ID": bool(os.environ.get("WEBFLOW_COLLECTION_ID")),
+        "REED_API_KEY": bool(os.environ.get("REED_API_KEY"))
     }
 
 
@@ -764,6 +765,59 @@ async def search_adzuna_jobs(
     except Exception as e:
         print(f"Adzuna API error: {str(e)}")
         return None
+    
+    
+async def search_job_reed(
+    keywords: List[str],
+    location: str ="london",
+    results_to_take: int = 5,
+    sort_by: str = "relevance",
+    page: int = 1
+) -> Optional[List[Dict[str, Any]]]:
+    
+    try: 
+        api_key = os.environ.get("REED_API_KEY")
+        
+        if not api_key: 
+            print("Reed API key not configured")
+            return None
+        # Base url for Reed API 
+        base_url = "https://www.reed.co.uk/api/1.0/search"
+        
+        # Calculate results to skip 
+        results_to_skip = (page-1) * results_to_take
+        
+        params ={
+            "keywords": "".join(keywords),
+            "locationName": location, 
+            "resultsToTake": min(results_to_take, 100),
+            "resultsToSkip": results_to_skip
+        }
+        
+        # Reed uses Basic Auth with APi key 
+        auth = httpx.BasicAuth(api_key, "")
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # auth passed here 
+            response = await client.get(base_url, params=params, auth=auth)
+            response.raise_for_status()
+            
+            data = response.json
+            results = data.get("results", [])
+            
+            print(f"Reed API returned {len(results)} jobs")
+            return results
+        
+    except httpx.TimeoutException:
+        print(f"Reed API timeout for query: {keywords}")
+        return None
+    except httpx.HTTPStatusError as e:
+        print(f"Reed API HTTP error {e.response.status_code}: {keywords}")
+        return None
+    except Exception as e:
+        print(f"Reed API error: {str(e)}")
+        return None
+    
 
 def deduplicate_jobs(jobs: List[Dict]) -> List[Dict]:
     """
